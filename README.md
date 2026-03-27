@@ -1,5 +1,7 @@
 # relay-tools
 
+[![Tests](https://github.com/miketsukerman/relay-tools/actions/workflows/tests.yml/badge.svg)](https://github.com/miketsukerman/relay-tools/actions/workflows/tests.yml)
+
 Python package for controlling relay hats on Raspberry Pi.
 Includes support for the [Waveshare RPi Relay Board (B)](https://www.waveshare.com/wiki/RPi_Relay_Board_(B))
 (8-channel GPIO relay hat) on Raspberry Pi 4 and Raspberry Pi 5.
@@ -100,28 +102,85 @@ uvicorn relay_tools.api:app --host 0.0.0.0 --port 8000
 
 Interactive documentation is available at `http://<host>:8000/docs`.
 
-### Example
+### Examples
 
 ```bash
 # Turn channel 1 on
 curl -X POST http://localhost:8000/relays/1/on
 
+# Turn channel 1 off
+curl -X POST http://localhost:8000/relays/1/off
+
+# Toggle channel 2
+curl -X POST http://localhost:8000/relays/2/toggle
+
 # Get state of all channels
 curl http://localhost:8000/relays
+
+# Get state of a single channel
+curl http://localhost:8000/relays/3
+
+# Turn all channels on
+curl -X POST http://localhost:8000/relays/on
+
+# Turn all channels off
+curl -X POST http://localhost:8000/relays/off
 ```
 
 ---
 
 ## Python API
 
+### Basic usage
+
 ```python
 from relay_tools import WaveshareRelayBoard
 
+# Use as a context manager – board is closed automatically on exit
 with WaveshareRelayBoard() as board:
     board.turn_on(1)          # close relay 1
     print(board.is_on(1))     # True
     print(board.get_state())  # {1: True, 2: False, ...}
     board.turn_off_all()
+```
+
+### Controlling individual channels
+
+```python
+from relay_tools import WaveshareRelayBoard
+
+with WaveshareRelayBoard() as board:
+    board.turn_on(3)           # activate channel 3
+    board.turn_off(3)          # deactivate channel 3
+
+    # Toggle: flip current state
+    if board.is_on(2):
+        board.turn_off(2)
+    else:
+        board.turn_on(2)
+```
+
+### Bulk operations
+
+```python
+from relay_tools import WaveshareRelayBoard
+
+with WaveshareRelayBoard() as board:
+    board.turn_on_all()        # activate every channel
+    state = board.get_state()  # {1: True, 2: True, ..., 8: True}
+    board.turn_off_all()       # deactivate every channel
+```
+
+### Error handling
+
+```python
+from relay_tools import WaveshareRelayBoard
+
+with WaveshareRelayBoard() as board:
+    try:
+        board.turn_on(99)      # invalid channel
+    except ValueError as exc:
+        print(exc)             # Channel 99 is out of range. Valid channels: 1–8.
 ```
 
 ### Implementing a custom driver
