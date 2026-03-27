@@ -60,22 +60,22 @@ pip install "relay-tools[gpio]"
 
 ```bash
 # Turn channel 1 ON
-relay-tools on 1
+relay on 1
 
 # Turn channel 3 OFF
-relay-tools off 3
+relay off 3
 
 # Toggle channel 2
-relay-tools toggle 2
+relay toggle 2
 
 # Show the state of all channels
-relay-tools status
+relay status
 
 # Turn all channels ON
-relay-tools all-on
+relay all-on
 
 # Turn all channels OFF
-relay-tools all-off
+relay all-off
 ```
 
 ---

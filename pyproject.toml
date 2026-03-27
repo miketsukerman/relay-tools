@@ -28,7 +28,7 @@ dev = [
 ]
 
 [project.scripts]
-relay-tools = "relay_tools.cli:cli"
+relay = "relay_tools.cli:cli"
 
 [tool.setuptools.packages.find]
 where = ["."]
