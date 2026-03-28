@@ -18,15 +18,13 @@ NUM_CHANNELS = 8
 
 
 def _make_board(initial_state: dict[int, bool] | None = None):
-    """Return a MagicMock that mimics WaveshareRelayBoard."""
+    """Return a MagicMock that mimics AbstractRelayBoard."""
     board = MagicMock()
     state: dict[int, bool] = (
         initial_state if initial_state is not None
         else {ch: False for ch in range(1, NUM_CHANNELS + 1)}
     )
 
-    board.__enter__ = MagicMock(return_value=board)
-    board.__exit__ = MagicMock(return_value=False)
     board.num_channels = NUM_CHANNELS
     board.is_on.side_effect = lambda ch: state[ch]
     board.get_state.return_value = state
@@ -112,6 +110,30 @@ class TestCLI:
         assert "OFF" in result.output
         board.turn_off_all.assert_called_once()
 
+    def test_driver_default_is_rpigpio(self, runner) -> None:
+        """Default driver should be rpigpio."""
+        with patch("relay_tools.cli._get_board", return_value=_make_board()) as mock_get:
+            runner.invoke(cli, ["on", "1"])
+        mock_get.assert_called_once_with("rpigpio")
+
+    def test_driver_gpiozero_option(self, runner) -> None:
+        """--driver gpiozero should pass 'gpiozero' to _get_board."""
+        with patch("relay_tools.cli._get_board", return_value=_make_board()) as mock_get:
+            runner.invoke(cli, ["--driver", "gpiozero", "on", "1"])
+        mock_get.assert_called_once_with("gpiozero")
+
+    def test_board_not_closed_after_on(self, runner) -> None:
+        """close() must NOT be called after on – relay must stay energized."""
+        board = _make_board()
+        self._run(runner, board, "on", "1")
+        board.close.assert_not_called()
+
+    def test_board_not_closed_after_off(self, runner) -> None:
+        """close() must NOT be called after off – relay must stay de-energized."""
+        board = _make_board({ch: True for ch in range(1, NUM_CHANNELS + 1)})
+        self._run(runner, board, "off", "1")
+        board.close.assert_not_called()
+
     def test_verbose_flag_enables_debug_logging(self, runner) -> None:
         board = _make_board()
         # Reset logging state so basicConfig takes effect inside the runner
@@ -157,3 +179,4 @@ class TestCLI:
         finally:
             root_logger.setLevel(original_level)
             root_logger.handlers = original_handlers
+
