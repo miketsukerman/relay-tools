@@ -73,19 +73,23 @@ class WaveshareRelayBoard(AbstractRelayBoard):
     gpiozero selects the compatible pin factory automatically.
 
     Args:
-        initial_state: If ``True`` all relays are activated on
-            initialisation; if ``False`` (default) all relays are
-            deactivated.
+        initial_state: Controls relay state on board initialisation.
+            ``True`` activates (closes) all relays; ``False`` deactivates
+            (opens) all relays.  ``None`` (default) reads the current
+            hardware pin state, preserving relay positions across process
+            restarts.
     """
 
-    def __init__(self, *, initial_state: bool = False) -> None:
+    def __init__(self, *, initial_state: bool | None = None) -> None:
         if not _HAS_GPIOZERO or OutputDevice is None:  # pragma: no cover
             raise ImportError(
                 "gpiozero is required for WaveshareRelayBoard. "
                 "Install it with: pip install relay-tools[gpio]"
             )
 
-        # active_high=False → on() drives the pin LOW (activates relay)
+        # active_high=False → on() drives the pin LOW (activates relay).
+        # initial_value=None → gpiozero reads the current hardware level so
+        # relay state is preserved across process restarts.
         self._relays = [
             OutputDevice(
                 pin,
@@ -147,12 +151,16 @@ class WaveshareRelayBoardRPiGPIO(AbstractRelayBoard):
     the ``RPi.GPIO`` library – use :class:`WaveshareRelayBoard` instead.
 
     Args:
-        initial_state: If ``True`` all relays are activated on
-            initialisation; if ``False`` (default) all relays are
-            deactivated.
+        initial_state: Controls relay state on board initialisation.
+            ``True`` activates (closes) all relays; ``False`` deactivates
+            (opens) all relays.  ``None`` (default) preserves the current
+            hardware state: pins already configured as outputs (by a
+            previous process invocation) are left unchanged, while pins
+            still in input mode are de-energised safely.  This lets every
+            CLI command affect only the channels it explicitly targets.
     """
 
-    def __init__(self, *, initial_state: bool = False) -> None:
+    def __init__(self, *, initial_state: bool | None = None) -> None:
         if not _HAS_RPIGPIO or GPIO is None:  # pragma: no cover
             raise ImportError(
                 "RPi.GPIO is required for WaveshareRelayBoardRPiGPIO. "
@@ -162,11 +170,19 @@ class WaveshareRelayBoardRPiGPIO(AbstractRelayBoard):
         GPIO.setwarnings(False)
         GPIO.setmode(GPIO.BCM)
 
-        # Configure every channel pin as an output.
         # Active-LOW: drive LOW to close the relay (ON), HIGH to open it (OFF).
         for pin in _CHANNEL_PINS[1:]:  # skip index-0 placeholder
-            GPIO.setup(pin, GPIO.OUT)
-            GPIO.output(pin, GPIO.LOW if initial_state else GPIO.HIGH)
+            if initial_state is not None:
+                # Caller explicitly requested a starting state.
+                GPIO.setup(pin, GPIO.OUT)
+                GPIO.output(pin, GPIO.LOW if initial_state else GPIO.HIGH)
+            elif GPIO.gpio_function(pin) != GPIO.OUT:
+                # Pin not yet configured as an output (e.g. first use after
+                # boot).  Set it HIGH so the relay is de-energised by default.
+                GPIO.setup(pin, GPIO.OUT)
+                GPIO.output(pin, GPIO.HIGH)
+            # else: pin is already an output from a previous invocation –
+            #       leave the relay in its current hardware state.
 
         logger.debug(
             "RPi.GPIO: initialised %d channels (initial_state=%s)",

@@ -17,11 +17,12 @@ _CHANNEL_PINS = (0, 5, 6, 13, 16, 19, 20, 21, 26)
 
 
 def _make_output_device(
-    pin: int, *, active_high: bool = False, initial_value: bool = False
+    pin: int, *, active_high: bool = False, initial_value: bool | None = None
 ):
     """Return a MagicMock that simulates gpiozero.OutputDevice."""
     dev = MagicMock()
-    dev.value = 1 if initial_value else 0
+    # None means "preserve current state" – in tests, treat as starting from OFF.
+    dev.value = 1 if initial_value is True else 0
 
     def _on() -> None:
         dev.value = 1
@@ -34,32 +35,40 @@ def _make_output_device(
     return dev
 
 
-def _make_gpio_mock(initial_state: bool = False):
+def _make_gpio_mock():
     """Return a MagicMock that simulates RPi.GPIO.
 
     Pin state tracks active-LOW logic: LOW (0) = ON, HIGH (1) = OFF.
+    Pins start in INPUT mode until ``GPIO.setup()`` is called.
     """
     gpio = MagicMock()
     gpio.BCM = 11
     gpio.OUT = 0
+    gpio.IN = 1
     gpio.LOW = 0
     gpio.HIGH = 1
 
-    # Per-pin state: True means pin is LOW (relay ON), False means HIGH (relay OFF)
+    # Per-pin output state (set by GPIO.output).
     _pin_state: dict[int, int] = {}
+    # Pins that have been configured as OUTPUT by GPIO.setup.
+    _pin_configured: set[int] = set()
 
     def _setup(pin, direction):
-        _pin_state[pin] = gpio.LOW if initial_state else gpio.HIGH
+        _pin_configured.add(pin)
 
     def _output(pin, value):
         _pin_state[pin] = value
 
     def _input(pin):
-        return _pin_state.get(pin, gpio.HIGH)
+        return _pin_state.get(pin, gpio.HIGH)  # default HIGH = de-energised
+
+    def _gpio_function(pin):
+        return gpio.OUT if pin in _pin_configured else gpio.IN
 
     gpio.setup.side_effect = _setup
     gpio.output.side_effect = _output
     gpio.input.side_effect = _input
+    gpio.gpio_function.side_effect = _gpio_function
     return gpio
 
 
@@ -214,6 +223,25 @@ class TestWaveshareRelayBoardRPiGPIO:
             b = WaveshareRelayBoardRPiGPIO(initial_state=True)
             for ch in range(1, NUM_CHANNELS + 1):
                 assert b.is_on(ch) is True
+
+    def test_init_preserves_relay_state_on_reinit(self, rpi_gpio_mock) -> None:
+        """Re-creating the board must not reset relays already set as outputs."""
+        # Simulate a previous process that left channel 1 ON (pin LOW) and
+        # the remaining channels OFF (pin HIGH), all pins already OUTPUT.
+        rpi_gpio_mock.gpio_function.side_effect = lambda pin: rpi_gpio_mock.OUT
+        rpi_gpio_mock.input.side_effect = (
+            lambda pin: rpi_gpio_mock.LOW if pin == _CHANNEL_PINS[1] else rpi_gpio_mock.HIGH
+        )
+        with patch("relay_tools.waveshare.GPIO", rpi_gpio_mock), \
+             patch("relay_tools.waveshare._HAS_RPIGPIO", True):
+            from relay_tools.waveshare import WaveshareRelayBoardRPiGPIO
+            b = WaveshareRelayBoardRPiGPIO()
+            # Relay state must be preserved, not reset.
+            assert b.is_on(1) is True
+            assert b.is_on(2) is False
+        # Neither GPIO.setup() nor GPIO.output() should have been called.
+        rpi_gpio_mock.setup.assert_not_called()
+        rpi_gpio_mock.output.assert_not_called()
 
     def test_close_calls_gpio_cleanup(self, rpi_board, rpi_gpio_mock) -> None:
         rpi_board.close()
