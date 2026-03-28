@@ -19,6 +19,7 @@ dependencies = [
 gpio = [
     "gpiozero>=2.0",
     "lgpio>=0.2",
+    "RPi.GPIO>=0.7.1",
 ]
 dev = [
     "pytest>=8.0",

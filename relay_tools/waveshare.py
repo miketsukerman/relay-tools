@@ -16,9 +16,15 @@ GPIO pins (active-LOW logic – the relay closes when the output is driven LOW):
     Channel 7 → BCM 21
     Channel 8 → BCM 26
 
-``gpiozero`` is used so that the driver works on both Raspberry Pi 4 and
-Raspberry Pi 5 (which requires the ``lgpio`` pin factory instead of the
-legacy ``RPi.GPIO`` backend).
+Two backend implementations are provided:
+
+* :class:`WaveshareRelayBoard` – uses :mod:`gpiozero` and works on both
+  Raspberry Pi 4 and Raspberry Pi 5 (which requires the ``lgpio`` pin
+  factory instead of the legacy ``RPi.GPIO`` backend).
+
+* :class:`WaveshareRelayBoardRPiGPIO` – uses :mod:`RPi.GPIO` directly,
+  matching the Waveshare reference examples.  Suited for Raspberry Pi 4
+  and earlier; Raspberry Pi 5 is not supported by RPi.GPIO.
 """
 
 from __future__ import annotations
@@ -35,6 +41,13 @@ try:
 except ImportError:  # pragma: no cover
     OutputDevice = None  # type: ignore[assignment,misc]
     _HAS_GPIOZERO = False
+
+try:
+    import RPi.GPIO as GPIO  # type: ignore[import-untyped]
+    _HAS_RPIGPIO = True
+except ImportError:  # pragma: no cover
+    GPIO = None  # type: ignore[assignment]
+    _HAS_RPIGPIO = False
 
 # BCM pin numbers indexed by 1-based channel (index 0 is unused).
 _CHANNEL_PINS: tuple[int, ...] = (
@@ -124,3 +137,89 @@ class WaveshareRelayBoard(AbstractRelayBoard):
 
     def __exit__(self, *args: object) -> None:
         self.close()
+
+
+class WaveshareRelayBoardRPiGPIO(AbstractRelayBoard):
+    """Driver for the Waveshare RPi Relay Board (B) using :mod:`RPi.GPIO`.
+
+    Matches the Waveshare reference example code.  Suitable for
+    Raspberry Pi 4 and earlier; Raspberry Pi 5 is **not** supported by
+    the ``RPi.GPIO`` library – use :class:`WaveshareRelayBoard` instead.
+
+    Args:
+        initial_state: If ``True`` all relays are activated on
+            initialisation; if ``False`` (default) all relays are
+            deactivated.
+    """
+
+    def __init__(self, *, initial_state: bool = False) -> None:
+        if not _HAS_RPIGPIO or GPIO is None:  # pragma: no cover
+            raise ImportError(
+                "RPi.GPIO is required for WaveshareRelayBoardRPiGPIO. "
+                "Install it with: pip install relay-tools[gpio]"
+            )
+
+        GPIO.setwarnings(False)
+        GPIO.setmode(GPIO.BCM)
+
+        # Configure every channel pin as an output.
+        # Active-LOW: drive LOW to close the relay (ON), HIGH to open it (OFF).
+        for pin in _CHANNEL_PINS[1:]:  # skip index-0 placeholder
+            GPIO.setup(pin, GPIO.OUT)
+            GPIO.output(pin, GPIO.LOW if initial_state else GPIO.HIGH)
+
+        logger.debug(
+            "RPi.GPIO: initialised %d channels (initial_state=%s)",
+            NUM_CHANNELS,
+            initial_state,
+        )
+
+    # ------------------------------------------------------------------
+    # AbstractRelayBoard interface
+    # ------------------------------------------------------------------
+
+    @property
+    def num_channels(self) -> int:
+        return NUM_CHANNELS
+
+    def turn_on(self, channel: int) -> None:
+        """Activate relay *channel* (close the relay contact)."""
+        self._validate_channel(channel)
+        logger.debug(
+            "RPi.GPIO: channel %d → ON (pin %d LOW)", channel, _CHANNEL_PINS[channel]
+        )
+        GPIO.output(_CHANNEL_PINS[channel], GPIO.LOW)  # active-LOW
+
+    def turn_off(self, channel: int) -> None:
+        """Deactivate relay *channel* (open the relay contact)."""
+        self._validate_channel(channel)
+        logger.debug(
+            "RPi.GPIO: channel %d → OFF (pin %d HIGH)", channel, _CHANNEL_PINS[channel]
+        )
+        GPIO.output(_CHANNEL_PINS[channel], GPIO.HIGH)  # active-LOW
+
+    def is_on(self, channel: int) -> bool:
+        """Return ``True`` if relay *channel* is currently active (contact closed)."""
+        self._validate_channel(channel)
+        # Active-LOW: pin reads LOW (0) when the relay is ON
+        state = GPIO.input(_CHANNEL_PINS[channel]) == GPIO.LOW
+        logger.debug(
+            "RPi.GPIO: channel %d state = %s", channel, "ON" if state else "OFF"
+        )
+        return state
+
+    # ------------------------------------------------------------------
+    # Cleanup
+    # ------------------------------------------------------------------
+
+    def close(self) -> None:
+        """Release all GPIO resources via ``RPi.GPIO.cleanup()``."""
+        logger.debug("RPi.GPIO: cleanup – releasing all pins")
+        GPIO.cleanup()
+
+    def __enter__(self) -> "WaveshareRelayBoardRPiGPIO":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        self.close()
+
