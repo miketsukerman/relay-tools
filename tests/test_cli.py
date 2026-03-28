@@ -110,10 +110,16 @@ class TestCLI:
         assert "OFF" in result.output
         board.turn_off_all.assert_called_once()
 
-    def test_driver_default_is_rpigpio(self, runner) -> None:
-        """Default driver should be rpigpio."""
+    def test_driver_default_is_auto(self, runner) -> None:
+        """Default driver should be 'auto' (auto-detect)."""
         with patch("relay_tools.cli._get_board", return_value=_make_board()) as mock_get:
             runner.invoke(cli, ["on", "1"])
+        mock_get.assert_called_once_with("auto")
+
+    def test_driver_rpigpio_option(self, runner) -> None:
+        """--driver rpigpio should pass 'rpigpio' to _get_board."""
+        with patch("relay_tools.cli._get_board", return_value=_make_board()) as mock_get:
+            runner.invoke(cli, ["--driver", "rpigpio", "on", "1"])
         mock_get.assert_called_once_with("rpigpio")
 
     def test_driver_gpiozero_option(self, runner) -> None:
@@ -180,3 +186,67 @@ class TestCLI:
             root_logger.setLevel(original_level)
             root_logger.handlers = original_handlers
 
+
+# ---------------------------------------------------------------------------
+# _get_board unit tests (auto-detection / error handling)
+# ---------------------------------------------------------------------------
+
+
+class TestGetBoard:
+    """Test auto-detection and error handling in _get_board."""
+
+    def test_auto_uses_rpigpio_when_available(self) -> None:
+        from relay_tools.cli import _get_board
+        mock_board = MagicMock()
+        with patch("relay_tools.cli.WaveshareRelayBoardRPiGPIO", return_value=mock_board):
+            board = _get_board("auto")
+        assert board is mock_board
+
+    def test_auto_falls_back_to_gpiozero_when_rpigpio_missing(self) -> None:
+        from relay_tools.cli import _get_board
+        mock_board = MagicMock()
+        with (
+            patch(
+                "relay_tools.cli.WaveshareRelayBoardRPiGPIO",
+                side_effect=ImportError("RPi.GPIO not installed"),
+            ),
+            patch("relay_tools.cli.WaveshareRelayBoard", return_value=mock_board),
+        ):
+            board = _get_board("auto")
+        assert board is mock_board
+
+    def test_explicit_rpigpio_raises_click_exception_when_missing(self) -> None:
+        import click
+        from relay_tools.cli import _get_board
+        with patch(
+            "relay_tools.cli.WaveshareRelayBoardRPiGPIO",
+            side_effect=ImportError("RPi.GPIO not installed"),
+        ):
+            with pytest.raises(click.ClickException):
+                _get_board("rpigpio")
+
+    def test_explicit_gpiozero_raises_click_exception_when_missing(self) -> None:
+        import click
+        from relay_tools.cli import _get_board
+        with patch(
+            "relay_tools.cli.WaveshareRelayBoard",
+            side_effect=ImportError("gpiozero not installed"),
+        ):
+            with pytest.raises(click.ClickException):
+                _get_board("gpiozero")
+
+    def test_auto_raises_click_exception_when_both_missing(self) -> None:
+        import click
+        from relay_tools.cli import _get_board
+        with (
+            patch(
+                "relay_tools.cli.WaveshareRelayBoardRPiGPIO",
+                side_effect=ImportError("RPi.GPIO not installed"),
+            ),
+            patch(
+                "relay_tools.cli.WaveshareRelayBoard",
+                side_effect=ImportError("gpiozero not installed"),
+            ),
+        ):
+            with pytest.raises(click.ClickException):
+                _get_board("auto")

@@ -35,17 +35,55 @@ from .base import AbstractRelayBoard
 
 logger = logging.getLogger(__name__)
 
+# Sentinel used by _get_board to signal auto-detection.
+_AUTO = "auto"
 
-def _get_board(driver: str = "rpigpio") -> AbstractRelayBoard:
+
+def _get_board(driver: str = _AUTO) -> AbstractRelayBoard:
     """Instantiate the relay board for the chosen *driver*.
 
     The board is **not** closed after each command so that the GPIO pin
     state (and therefore the relay position) is preserved after the
     process exits.  GPIO cleanup is left to the OS on process termination.
+
+    When *driver* is ``"auto"`` (the default), ``rpigpio`` is tried first
+    and ``gpiozero`` is used as a fallback so the CLI works regardless of
+    which GPIO library is installed.  When an explicit driver is requested
+    and that library is missing a :class:`click.ClickException` is raised
+    with an actionable install hint.
     """
+    if driver == _AUTO:
+        # Try RPi.GPIO first (pin state persists after process exit).
+        try:
+            return WaveshareRelayBoardRPiGPIO()
+        except ImportError:
+            pass
+        # Fall back to gpiozero.
+        try:
+            return WaveshareRelayBoard()
+        except ImportError:
+            raise click.ClickException(
+                "No GPIO library found. Install one with:\n"
+                "  pip install relay-tools[gpio]"
+            )
+
     if driver == "rpigpio":
-        return WaveshareRelayBoardRPiGPIO()
-    return WaveshareRelayBoard()
+        try:
+            return WaveshareRelayBoardRPiGPIO()
+        except ImportError:
+            raise click.ClickException(
+                "RPi.GPIO is not available. Install it with:\n"
+                "  pip install relay-tools[gpio]"
+            )
+
+    # driver == "gpiozero"
+    try:
+        return WaveshareRelayBoard()
+    except ImportError:
+        raise click.ClickException(
+            "gpiozero is not available. Install it with:\n"
+            "  pip install relay-tools[gpio]"
+        )
 
 
 @click.group()
@@ -58,10 +96,10 @@ def _get_board(driver: str = "rpigpio") -> AbstractRelayBoard:
 )
 @click.option(
     "--driver",
-    type=click.Choice(["rpigpio", "gpiozero"]),
-    default="rpigpio",
+    type=click.Choice(["auto", "rpigpio", "gpiozero"]),
+    default="auto",
     show_default=True,
-    help="GPIO backend driver to use.",
+    help="GPIO backend driver to use.  'auto' tries rpigpio first, then gpiozero.",
 )
 @click.pass_context
 def cli(ctx: click.Context, verbose: bool, driver: str) -> None:
