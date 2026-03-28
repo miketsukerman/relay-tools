@@ -23,9 +23,13 @@ relay all-off
 
 from __future__ import annotations
 
+import logging
+
 import click
 
 from .waveshare import WaveshareRelayBoard
+
+logger = logging.getLogger(__name__)
 
 
 def _get_board() -> WaveshareRelayBoard:
@@ -34,14 +38,28 @@ def _get_board() -> WaveshareRelayBoard:
 
 
 @click.group()
-def cli() -> None:
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    default=False,
+    help="Enable verbose (DEBUG) logging.",
+)
+@click.pass_context
+def cli(ctx: click.Context, verbose: bool) -> None:
     """relay – control the Waveshare RPi Relay Board (B)."""
+    logging.basicConfig(
+        level=logging.DEBUG if verbose else logging.WARNING,
+        format="%(levelname)s %(name)s: %(message)s",
+    )
+    logger.debug("Verbose logging enabled.")
 
 
 @cli.command("on")
 @click.argument("channel", type=int)
 def cmd_on(channel: int) -> None:
     """Turn relay CHANNEL on (close the contact)."""
+    logger.debug("Turning channel %d ON", channel)
     with _get_board() as board:
         board.turn_on(channel)
     click.echo(f"Channel {channel}: ON")
@@ -51,6 +69,7 @@ def cmd_on(channel: int) -> None:
 @click.argument("channel", type=int)
 def cmd_off(channel: int) -> None:
     """Turn relay CHANNEL off (open the contact)."""
+    logger.debug("Turning channel %d OFF", channel)
     with _get_board() as board:
         board.turn_off(channel)
     click.echo(f"Channel {channel}: OFF")
@@ -60,6 +79,7 @@ def cmd_off(channel: int) -> None:
 @click.argument("channel", type=int)
 def toggle(channel: int) -> None:
     """Toggle relay CHANNEL."""
+    logger.debug("Toggling channel %d", channel)
     with _get_board() as board:
         if board.is_on(channel):
             board.turn_off(channel)
@@ -73,6 +93,7 @@ def toggle(channel: int) -> None:
 @cli.command()
 def status() -> None:
     """Print the state of every relay channel."""
+    logger.debug("Fetching status of all channels")
     with _get_board() as board:
         for ch, active in board.get_state().items():
             label = "ON " if active else "OFF"
@@ -82,6 +103,7 @@ def status() -> None:
 @cli.command("all-on")
 def cmd_all_on() -> None:
     """Turn ALL relay channels on."""
+    logger.debug("Turning all channels ON")
     with _get_board() as board:
         board.turn_on_all()
     click.echo("All channels: ON")
@@ -90,6 +112,7 @@ def cmd_all_on() -> None:
 @cli.command("all-off")
 def cmd_all_off() -> None:
     """Turn ALL relay channels off."""
+    logger.debug("Turning all channels OFF")
     with _get_board() as board:
         board.turn_off_all()
     click.echo("All channels: OFF")

@@ -23,7 +23,11 @@ legacy ``RPi.GPIO`` backend).
 
 from __future__ import annotations
 
+import logging
+
 from .base import AbstractRelayBoard
+
+logger = logging.getLogger(__name__)
 
 try:
     from gpiozero import OutputDevice
@@ -89,17 +93,21 @@ class WaveshareRelayBoard(AbstractRelayBoard):
     def turn_on(self, channel: int) -> None:
         """Activate relay *channel* (close the relay contact)."""
         self._validate_channel(channel)
+        logger.debug("GPIO: channel %d → ON (pin %d)", channel, _CHANNEL_PINS[channel])
         self._relays[channel - 1].on()
 
     def turn_off(self, channel: int) -> None:
         """Deactivate relay *channel* (open the relay contact)."""
         self._validate_channel(channel)
+        logger.debug("GPIO: channel %d → OFF (pin %d)", channel, _CHANNEL_PINS[channel])
         self._relays[channel - 1].off()
 
     def is_on(self, channel: int) -> bool:
         """Return ``True`` if relay *channel* is currently active."""
         self._validate_channel(channel)
-        return bool(self._relays[channel - 1].value)
+        state = bool(self._relays[channel - 1].value)
+        logger.debug("GPIO: channel %d state = %s", channel, "ON" if state else "OFF")
+        return state
 
     # ------------------------------------------------------------------
     # Cleanup
@@ -107,6 +115,7 @@ class WaveshareRelayBoard(AbstractRelayBoard):
 
     def close(self) -> None:
         """Release all GPIO resources."""
+        logger.debug("Closing GPIO resources for all %d channels", len(self._relays))
         for relay in self._relays:
             relay.close()
 

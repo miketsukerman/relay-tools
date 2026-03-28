@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -110,3 +111,49 @@ class TestCLI:
         assert result.exit_code == 0
         assert "OFF" in result.output
         board.turn_off_all.assert_called_once()
+
+    def test_verbose_flag_enables_debug_logging(self, runner) -> None:
+        board = _make_board()
+        # Reset logging state so basicConfig takes effect inside the runner
+        root_logger = logging.getLogger()
+        original_level = root_logger.level
+        original_handlers = root_logger.handlers[:]
+        root_logger.handlers.clear()
+        try:
+            with patch("relay_tools.cli._get_board", return_value=board):
+                result = runner.invoke(cli, ["--verbose", "on", "1"])
+            assert result.exit_code == 0
+            assert root_logger.level == logging.DEBUG
+        finally:
+            root_logger.setLevel(original_level)
+            root_logger.handlers = original_handlers
+
+    def test_no_verbose_flag_uses_warning_logging(self, runner) -> None:
+        board = _make_board()
+        root_logger = logging.getLogger()
+        original_level = root_logger.level
+        original_handlers = root_logger.handlers[:]
+        root_logger.handlers.clear()
+        try:
+            with patch("relay_tools.cli._get_board", return_value=board):
+                result = runner.invoke(cli, ["on", "1"])
+            assert result.exit_code == 0
+            assert root_logger.level == logging.WARNING
+        finally:
+            root_logger.setLevel(original_level)
+            root_logger.handlers = original_handlers
+
+    def test_verbose_short_flag(self, runner) -> None:
+        board = _make_board()
+        root_logger = logging.getLogger()
+        original_level = root_logger.level
+        original_handlers = root_logger.handlers[:]
+        root_logger.handlers.clear()
+        try:
+            with patch("relay_tools.cli._get_board", return_value=board):
+                result = runner.invoke(cli, ["-v", "on", "1"])
+            assert result.exit_code == 0
+            assert root_logger.level == logging.DEBUG
+        finally:
+            root_logger.setLevel(original_level)
+            root_logger.handlers = original_handlers
