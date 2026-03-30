@@ -181,8 +181,13 @@ class WaveshareRelayBoardRPiGPIO(AbstractRelayBoard):
                 # boot).  Set it HIGH so the relay is de-energised by default.
                 GPIO.setup(pin, GPIO.OUT)
                 GPIO.output(pin, GPIO.HIGH)
-            # else: pin is already an output from a previous invocation –
-            #       leave the relay in its current hardware state.
+            else:
+                # Pin is already an output from a previous invocation.
+                # RPi.GPIO maintains per-process software state – always call
+                # setup() without initial= so the pin is registered for this
+                # process (enabling input()/output() calls) without changing
+                # the current output level, leaving the relay where it was.
+                GPIO.setup(pin, GPIO.OUT)
 
         logger.debug(
             "RPi.GPIO: initialised %d channels (initial_state=%s)",

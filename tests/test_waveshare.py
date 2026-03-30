@@ -225,7 +225,7 @@ class TestWaveshareRelayBoardRPiGPIO:
                 assert b.is_on(ch) is True
 
     def test_init_preserves_relay_state_on_reinit(self, rpi_gpio_mock) -> None:
-        """Re-creating the board must not reset relays already set as outputs."""
+        """Re-creating the board registers GPIO pins without resetting relay state."""
         # Simulate a previous process that left channel 1 ON (pin LOW) and
         # the remaining channels OFF (pin HIGH), all pins already OUTPUT.
         rpi_gpio_mock.gpio_function.side_effect = lambda pin: rpi_gpio_mock.OUT
@@ -239,8 +239,10 @@ class TestWaveshareRelayBoardRPiGPIO:
             # Relay state must be preserved, not reset.
             assert b.is_on(1) is True
             assert b.is_on(2) is False
-        # Neither GPIO.setup() nor GPIO.output() should have been called.
-        rpi_gpio_mock.setup.assert_not_called()
+        # GPIO.setup() MUST be called for all channels so RPi.GPIO's
+        # per-process software state is populated (enables input()/output()).
+        assert rpi_gpio_mock.setup.call_count == NUM_CHANNELS
+        # GPIO.output() must NOT be called – relay levels stay unchanged.
         rpi_gpio_mock.output.assert_not_called()
 
     def test_close_calls_gpio_cleanup(self, rpi_board, rpi_gpio_mock) -> None:
