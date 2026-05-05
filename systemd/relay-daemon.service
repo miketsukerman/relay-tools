@@ -1,0 +1,76 @@
+# relay-daemon.service — systemd unit for the relay-tools HTTP API daemon
+#
+# Installation
+# ------------
+# 1. Copy this file to the systemd system directory:
+#       sudo cp relay-daemon.service /etc/systemd/system/
+#
+# 2. Reload the systemd manager:
+#       sudo systemctl daemon-reload
+#
+# 3. Enable the service to start automatically on boot:
+#       sudo systemctl enable relay-daemon.service
+#
+# 4. Start the service immediately:
+#       sudo systemctl start relay-daemon.service
+#
+# 5. Check its status:
+#       sudo systemctl status relay-daemon.service
+#
+# Configuration
+# -------------
+# Override any setting without editing this file by using a drop-in:
+#       sudo systemctl edit relay-daemon.service
+#
+# Common overrides:
+#   - Change listen port:        Environment=RELAY_PORT=9000
+#   - Force a specific driver:   Environment=RELAY_DRIVER=rpigpio
+#   - Bind to localhost only:    ExecStart=… --host 127.0.0.1
+#
+# Requirements
+# ------------
+# relay-tools must be installed (with GPIO extras) before enabling this unit:
+#   pip install relay-tools[gpio]
+#
+# On Raspberry Pi the process user must be in the 'gpio' group, or you can
+# run as root (SupplementaryGroups= / User= below).
+
+[Unit]
+Description=relay-tools HTTP API daemon
+Documentation=https://github.com/miketsukerman/relay-tools
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+
+# Run as root so GPIO access is available without extra group configuration.
+# To run as a dedicated user instead, create that user, add it to the 'gpio'
+# group, and change the two lines below:
+#   User=relay
+#   SupplementaryGroups=gpio
+User=root
+
+# Path to the relay CLI entry point installed by pip.
+# Adjust if you installed into a virtualenv, e.g.:
+#   /opt/relay-tools/bin/relay serve --host 0.0.0.0 --port 8000
+ExecStart=/usr/local/bin/relay serve --host 0.0.0.0 --port 8000
+
+# GPIO driver: "auto" (default) tries RPi.GPIO first, then gpiozero.
+# Override with "rpigpio" or "gpiozero" if auto-detection is unreliable.
+Environment=RELAY_DRIVER=auto
+
+# Restart the daemon automatically if it crashes.
+Restart=on-failure
+RestartSec=5s
+
+# Give the process time to shut down cleanly before SIGKILL.
+TimeoutStopSec=10s
+
+# Write stdout/stderr to the systemd journal (view with journalctl -u relay-daemon).
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=relay-daemon
+
+[Install]
+WantedBy=multi-user.target
