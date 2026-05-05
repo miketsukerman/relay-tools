@@ -198,17 +198,39 @@ def cmd_all_off(ctx: click.Context) -> None:
     type=int,
     help="TCP port for the API server.",
 )
+@click.option(
+    "--config",
+    default=None,
+    metavar="PATH",
+    help=(
+        "Path to a YAML file defining per-channel initial states. "
+        "Defaults to the RELAY_CONFIG environment variable if set; "
+        "otherwise all channels start off."
+    ),
+)
 @click.pass_context
-def cmd_serve(ctx: click.Context, host: str, port: int) -> None:
+def cmd_serve(ctx: click.Context, host: str, port: int, config: str | None) -> None:
     """Start the relay HTTP API daemon.
 
     The selected GPIO driver is forwarded to the API process via the
     ``RELAY_DRIVER`` environment variable so the lifespan startup picks
     the correct backend without needing a second CLI flag.
+
+    All channels are initialised to OFF on startup.  Use --config (or set
+    ``RELAY_CONFIG``) to specify a YAML file that overrides individual
+    channel states.
     """
     driver = ctx.obj["driver"]
     os.environ["RELAY_DRIVER"] = driver
-    logger.debug("Starting API server on %s:%d (driver=%s)", host, port, driver)
+    if config is not None:
+        os.environ["RELAY_CONFIG"] = config
+    logger.debug(
+        "Starting API server on %s:%d (driver=%s, config=%s)",
+        host,
+        port,
+        driver,
+        config,
+    )
     uvicorn.run("relay_tools.api:app", host=host, port=port)
 
 

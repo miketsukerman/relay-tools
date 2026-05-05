@@ -5,27 +5,36 @@
 # 1. Copy this file to the systemd system directory:
 #       sudo cp relay-daemon.service /etc/systemd/system/
 #
-# 2. Reload the systemd manager:
+# 2. Copy the sample channel config (edit to taste):
+#       sudo mkdir -p /etc/relay
+#       sudo cp channels.yaml /etc/relay/channels.yaml
+#
+# 3. Reload the systemd manager:
 #       sudo systemctl daemon-reload
 #
-# 3. Enable the service to start automatically on boot:
+# 4. Enable the service to start automatically on boot:
 #       sudo systemctl enable relay-daemon.service
 #
-# 4. Start the service immediately:
+# 5. Start the service immediately:
 #       sudo systemctl start relay-daemon.service
 #
-# 5. Check its status:
+# 6. Check its status:
 #       sudo systemctl status relay-daemon.service
 #
 # Configuration
 # -------------
+# Channel initial states are read from /etc/relay/channels.yaml on every
+# start.  All channels default to OFF if the file is absent or a channel
+# is not listed.  See channels.yaml for the file format.
+#
 # Override any setting without editing this file by using a drop-in:
 #       sudo systemctl edit relay-daemon.service
 #
 # Common overrides:
-#   - Change listen port:        Environment=RELAY_PORT=9000
+#   - Change listen port:        ExecStart=/usr/local/bin/relay serve --port 9000
 #   - Force a specific driver:   Environment=RELAY_DRIVER=rpigpio
 #   - Bind to localhost only:    ExecStart=… --host 127.0.0.1
+#   - Use a different config:    Environment=RELAY_CONFIG=/etc/relay/custom.yaml
 #
 # Requirements
 # ------------
@@ -51,6 +60,9 @@ Type=simple
 #   SupplementaryGroups=gpio
 User=root
 
+# Ensure the config directory exists before starting.
+ExecStartPre=-/bin/mkdir -p /etc/relay
+
 # Path to the relay CLI entry point installed by pip.
 # Adjust if you installed into a virtualenv, e.g.:
 #   /opt/relay-tools/bin/relay serve --host 0.0.0.0 --port 8000
@@ -59,6 +71,10 @@ ExecStart=/usr/local/bin/relay serve --host 0.0.0.0 --port 8000
 # GPIO driver: "auto" (default) tries RPi.GPIO first, then gpiozero.
 # Override with "rpigpio" or "gpiozero" if auto-detection is unreliable.
 Environment=RELAY_DRIVER=auto
+
+# Path to the per-channel initial-state config file.  All channels start
+# OFF if the file is absent; channels not listed also default to OFF.
+Environment=RELAY_CONFIG=/etc/relay/channels.yaml
 
 # Restart the daemon automatically if it crashes.
 Restart=on-failure

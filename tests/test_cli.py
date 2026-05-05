@@ -257,7 +257,6 @@ class TestGetBoard:
 # relay serve tests
 # ---------------------------------------------------------------------------
 
-
 class TestServeCommand:
     def test_serve_default_host_and_port(self, runner) -> None:
         """relay serve starts uvicorn on 0.0.0.0:8000 by default."""
@@ -291,3 +290,20 @@ class TestServeCommand:
         with patch("relay_tools.cli.uvicorn"):
             runner.invoke(cli, ["--driver", "rpigpio", "serve"])
         assert os.environ.get("RELAY_DRIVER") == "rpigpio"
+
+    def test_serve_config_option_sets_relay_config_env(self, runner, monkeypatch) -> None:
+        """--config sets the RELAY_CONFIG environment variable."""
+        monkeypatch.delenv("RELAY_CONFIG", raising=False)
+        with patch("relay_tools.cli.uvicorn"):
+            result = runner.invoke(cli, ["serve", "--config", "/etc/relay/channels.yaml"])
+        assert result.exit_code == 0
+        assert os.environ.get("RELAY_CONFIG") == "/etc/relay/channels.yaml"
+
+    def test_serve_no_config_option_leaves_relay_config_env_unchanged(
+        self, runner, monkeypatch
+    ) -> None:
+        """Without --config the RELAY_CONFIG env var is not modified."""
+        monkeypatch.delenv("RELAY_CONFIG", raising=False)
+        with patch("relay_tools.cli.uvicorn"):
+            runner.invoke(cli, ["serve"])
+        assert os.environ.get("RELAY_CONFIG") is None

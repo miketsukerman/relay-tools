@@ -12,8 +12,11 @@ relay-api
 
 Environment variables
 ---------------------
-RELAY_DRIVER  GPIO backend to use: "auto" (default), "rpigpio", or "gpiozero".
-              "auto" tries rpigpio first and falls back to gpiozero.
+RELAY_DRIVER   GPIO backend to use: "auto" (default), "rpigpio", or "gpiozero".
+               "auto" tries rpigpio first and falls back to gpiozero.
+RELAY_CONFIG   Path to a YAML file that defines per-channel initial states.
+               If unset, or if the file does not exist, all channels start off.
+               See ``relay_tools.config.load_channel_config`` for the format.
 
 Endpoints
 ---------
@@ -36,6 +39,7 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from .base import AbstractRelayBoard
+from .config import load_channel_config
 from .waveshare import WaveshareRelayBoard, WaveshareRelayBoardRPiGPIO
 
 # ---------------------------------------------------------------------------
@@ -43,7 +47,7 @@ from .waveshare import WaveshareRelayBoard, WaveshareRelayBoardRPiGPIO
 # ---------------------------------------------------------------------------
 
 
-def _create_board(driver: str = "auto") -> AbstractRelayBoard:
+def _create_board(driver: str = "auto", initial_state: bool = False) -> AbstractRelayBoard:
     """Instantiate the appropriate relay board backend.
 
     Mirrors the auto-detection logic in :func:`relay_tools.cli._get_board`
@@ -53,17 +57,19 @@ def _create_board(driver: str = "auto") -> AbstractRelayBoard:
     Args:
         driver: ``"auto"`` tries rpigpio first and falls back to gpiozero.
             ``"rpigpio"`` and ``"gpiozero"`` select the backend explicitly.
+        initial_state: Initial state applied to every relay channel.
+            ``False`` (default) ensures all channels start off.
 
     Raises:
         RuntimeError: When the requested GPIO library is not installed.
     """
     if driver == "auto":
         try:
-            return WaveshareRelayBoardRPiGPIO()
+            return WaveshareRelayBoardRPiGPIO(initial_state=initial_state)
         except ImportError:
             pass
         try:
-            return WaveshareRelayBoard()
+            return WaveshareRelayBoard(initial_state=initial_state)
         except ImportError:
             raise RuntimeError(
                 "No GPIO library found. "
@@ -72,7 +78,7 @@ def _create_board(driver: str = "auto") -> AbstractRelayBoard:
 
     if driver == "rpigpio":
         try:
-            return WaveshareRelayBoardRPiGPIO()
+            return WaveshareRelayBoardRPiGPIO(initial_state=initial_state)
         except ImportError:
             raise RuntimeError(
                 "RPi.GPIO is not available. "
@@ -81,7 +87,7 @@ def _create_board(driver: str = "auto") -> AbstractRelayBoard:
 
     # driver == "gpiozero"
     try:
-        return WaveshareRelayBoard()
+        return WaveshareRelayBoard(initial_state=initial_state)
     except ImportError:
         raise RuntimeError(
             "gpiozero is not available. "
@@ -106,7 +112,19 @@ def _get_board() -> AbstractRelayBoard:
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     global _board
     driver = os.environ.get("RELAY_DRIVER", "auto")
-    _board = _create_board(driver)
+    # Always start with all channels off; per-channel overrides are applied below.
+    _board = _create_board(driver, initial_state=False)
+
+    # Apply per-channel initial states from the YAML config (if configured).
+    config_path = os.environ.get("RELAY_CONFIG")
+    if config_path:
+        channel_states = load_channel_config(config_path)
+        for channel, state in channel_states.items():
+            if state:
+                _board.turn_on(channel)
+            else:
+                _board.turn_off(channel)
+
     try:
         yield
     finally:

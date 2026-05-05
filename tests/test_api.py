@@ -141,9 +141,20 @@ class TestCreateBoard:
         mock_board = MagicMock()
         with patch(
             "relay_tools.api.WaveshareRelayBoardRPiGPIO", return_value=mock_board
-        ):
+        ) as mock_cls:
             board = _create_board("auto")
         assert board is mock_board
+        mock_cls.assert_called_once_with(initial_state=False)
+
+    def test_auto_uses_rpigpio_first_with_custom_initial_state(self) -> None:
+        from relay_tools.api import _create_board
+        mock_board = MagicMock()
+        with patch(
+            "relay_tools.api.WaveshareRelayBoardRPiGPIO", return_value=mock_board
+        ) as mock_cls:
+            board = _create_board("auto", initial_state=True)
+        assert board is mock_board
+        mock_cls.assert_called_once_with(initial_state=True)
 
     def test_auto_falls_back_to_gpiozero(self) -> None:
         from relay_tools.api import _create_board
@@ -153,10 +164,11 @@ class TestCreateBoard:
                 "relay_tools.api.WaveshareRelayBoardRPiGPIO",
                 side_effect=ImportError("no RPi.GPIO"),
             ),
-            patch("relay_tools.api.WaveshareRelayBoard", return_value=mock_board),
+            patch("relay_tools.api.WaveshareRelayBoard", return_value=mock_board) as mock_cls,
         ):
             board = _create_board("auto")
         assert board is mock_board
+        mock_cls.assert_called_once_with(initial_state=False)
 
     def test_auto_raises_when_both_missing(self) -> None:
         from relay_tools.api import _create_board
@@ -191,13 +203,64 @@ class TestCreateBoard:
             with pytest.raises(RuntimeError, match="gpiozero"):
                 _create_board("gpiozero")
 
-    def test_lifespan_reads_relay_driver_env(self, monkeypatch) -> None:
-        """_lifespan passes RELAY_DRIVER env var to _create_board."""
-        monkeypatch.setenv("RELAY_DRIVER", "rpigpio")
+    def test_lifespan_creates_board_with_all_off(self, monkeypatch) -> None:
+        """_lifespan passes initial_state=False to _create_board."""
+        monkeypatch.delenv("RELAY_CONFIG", raising=False)
         mock_board = MagicMock()
         with patch(
             "relay_tools.api._create_board", return_value=mock_board
         ) as mock_factory:
             with TestClient(app, raise_server_exceptions=True):
                 pass
-        mock_factory.assert_called_once_with("rpigpio")
+        mock_factory.assert_called_once_with("auto", initial_state=False)
+
+    def test_lifespan_reads_relay_driver_env(self, monkeypatch) -> None:
+        """_lifespan passes RELAY_DRIVER env var to _create_board."""
+        monkeypatch.setenv("RELAY_DRIVER", "rpigpio")
+        monkeypatch.delenv("RELAY_CONFIG", raising=False)
+        mock_board = MagicMock()
+        with patch(
+            "relay_tools.api._create_board", return_value=mock_board
+        ) as mock_factory:
+            with TestClient(app, raise_server_exceptions=True):
+                pass
+        mock_factory.assert_called_once_with("rpigpio", initial_state=False)
+
+    def test_lifespan_applies_channel_config(self, monkeypatch, tmp_path) -> None:
+        """_lifespan turns on channels listed as 'on' in the YAML config."""
+        config = tmp_path / "channels.yaml"
+        config.write_text("channels:\n  1: on\n  3: on\n")
+        monkeypatch.setenv("RELAY_CONFIG", str(config))
+        monkeypatch.delenv("RELAY_DRIVER", raising=False)
+        mock_board = MagicMock()
+        with patch("relay_tools.api._create_board", return_value=mock_board):
+            with TestClient(app, raise_server_exceptions=True):
+                pass
+        # Channels 1 and 3 should be turned on; no turn_off calls from config.
+        turn_on_calls = [call.args[0] for call in mock_board.turn_on.call_args_list]
+        assert 1 in turn_on_calls
+        assert 3 in turn_on_calls
+
+    def test_lifespan_applies_off_channels_from_config(self, monkeypatch, tmp_path) -> None:
+        """Channels explicitly set to off in config call turn_off."""
+        config = tmp_path / "channels.yaml"
+        config.write_text("channels:\n  2: off\n")
+        monkeypatch.setenv("RELAY_CONFIG", str(config))
+        monkeypatch.delenv("RELAY_DRIVER", raising=False)
+        mock_board = MagicMock()
+        with patch("relay_tools.api._create_board", return_value=mock_board):
+            with TestClient(app, raise_server_exceptions=True):
+                pass
+        turn_off_calls = [call.args[0] for call in mock_board.turn_off.call_args_list]
+        assert 2 in turn_off_calls
+
+    def test_lifespan_no_config_no_channel_calls(self, monkeypatch) -> None:
+        """Without RELAY_CONFIG no per-channel calls are made after board creation."""
+        monkeypatch.delenv("RELAY_CONFIG", raising=False)
+        monkeypatch.delenv("RELAY_DRIVER", raising=False)
+        mock_board = MagicMock()
+        with patch("relay_tools.api._create_board", return_value=mock_board):
+            with TestClient(app, raise_server_exceptions=True):
+                pass
+        mock_board.turn_on.assert_not_called()
+        mock_board.turn_off.assert_not_called()
