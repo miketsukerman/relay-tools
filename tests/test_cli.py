@@ -113,19 +113,25 @@ class TestCLI:
 
     def test_driver_default_is_auto(self, runner) -> None:
         """Default driver should be 'auto' (auto-detect)."""
-        with patch("relay_tools.cli._get_board", return_value=_make_board()) as mock_get:
+        with patch(
+            "relay_tools.cli._get_board", return_value=_make_board()
+        ) as mock_get:
             runner.invoke(cli, ["on", "1"])
         mock_get.assert_called_once_with("auto")
 
     def test_driver_rpigpio_option(self, runner) -> None:
         """--driver rpigpio should pass 'rpigpio' to _get_board."""
-        with patch("relay_tools.cli._get_board", return_value=_make_board()) as mock_get:
+        with patch(
+            "relay_tools.cli._get_board", return_value=_make_board()
+        ) as mock_get:
             runner.invoke(cli, ["--driver", "rpigpio", "on", "1"])
         mock_get.assert_called_once_with("rpigpio")
 
     def test_driver_gpiozero_option(self, runner) -> None:
         """--driver gpiozero should pass 'gpiozero' to _get_board."""
-        with patch("relay_tools.cli._get_board", return_value=_make_board()) as mock_get:
+        with patch(
+            "relay_tools.cli._get_board", return_value=_make_board()
+        ) as mock_get:
             runner.invoke(cli, ["--driver", "gpiozero", "on", "1"])
         mock_get.assert_called_once_with("gpiozero")
 
@@ -199,7 +205,9 @@ class TestGetBoard:
     def test_auto_uses_rpigpio_when_available(self) -> None:
         from relay_tools.cli import _get_board
         mock_board = MagicMock()
-        with patch("relay_tools.cli.WaveshareRelayBoardRPiGPIO", return_value=mock_board):
+        with patch(
+            "relay_tools.cli.WaveshareRelayBoardRPiGPIO", return_value=mock_board
+        ):
             board = _get_board("auto")
         assert board is mock_board
 
@@ -218,6 +226,7 @@ class TestGetBoard:
 
     def test_explicit_rpigpio_raises_click_exception_when_missing(self) -> None:
         import click
+
         from relay_tools.cli import _get_board
         with patch(
             "relay_tools.cli.WaveshareRelayBoardRPiGPIO",
@@ -228,6 +237,7 @@ class TestGetBoard:
 
     def test_explicit_gpiozero_raises_click_exception_when_missing(self) -> None:
         import click
+
         from relay_tools.cli import _get_board
         with patch(
             "relay_tools.cli.WaveshareRelayBoard",
@@ -238,6 +248,7 @@ class TestGetBoard:
 
     def test_auto_raises_click_exception_when_both_missing(self) -> None:
         import click
+
         from relay_tools.cli import _get_board
         with (
             patch(
@@ -291,11 +302,15 @@ class TestServeCommand:
             runner.invoke(cli, ["--driver", "rpigpio", "serve"])
         assert os.environ.get("RELAY_DRIVER") == "rpigpio"
 
-    def test_serve_config_option_sets_relay_config_env(self, runner, monkeypatch) -> None:
+    def test_serve_config_option_sets_relay_config_env(
+        self, runner, monkeypatch
+    ) -> None:
         """--config sets the RELAY_CONFIG environment variable."""
         monkeypatch.delenv("RELAY_CONFIG", raising=False)
         with patch("relay_tools.cli.uvicorn"):
-            result = runner.invoke(cli, ["serve", "--config", "/etc/relay/channels.yaml"])
+            result = runner.invoke(
+                cli, ["serve", "--config", "/etc/relay/channels.yaml"]
+            )
         assert result.exit_code == 0
         assert os.environ.get("RELAY_CONFIG") == "/etc/relay/channels.yaml"
 

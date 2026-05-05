@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -230,7 +230,9 @@ class TestWaveshareRelayBoardRPiGPIO:
         # the remaining channels OFF (pin HIGH), all pins already OUTPUT.
         rpi_gpio_mock.gpio_function.side_effect = lambda pin: rpi_gpio_mock.OUT
         rpi_gpio_mock.input.side_effect = (
-            lambda pin: rpi_gpio_mock.LOW if pin == _CHANNEL_PINS[1] else rpi_gpio_mock.HIGH
+            lambda pin: rpi_gpio_mock.LOW
+            if pin == _CHANNEL_PINS[1]
+            else rpi_gpio_mock.HIGH
         )
         with patch("relay_tools.waveshare.GPIO", rpi_gpio_mock), \
              patch("relay_tools.waveshare._HAS_RPIGPIO", True):

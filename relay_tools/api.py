@@ -47,7 +47,9 @@ from .waveshare import WaveshareRelayBoard, WaveshareRelayBoardRPiGPIO
 # ---------------------------------------------------------------------------
 
 
-def _create_board(driver: str = "auto", initial_state: bool = False) -> AbstractRelayBoard:
+def _create_board(
+    driver: str = "auto", initial_state: bool = False
+) -> AbstractRelayBoard:
     """Instantiate the appropriate relay board backend.
 
     Mirrors the auto-detection logic in :func:`relay_tools.cli._get_board`
