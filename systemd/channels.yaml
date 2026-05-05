@@ -17,19 +17,9 @@
 #   Channel 7 → BCM 21
 #   Channel 8 → BCM 26
 #
-# Example: channels 1 and 3 on, all others off
-#
-# channels:
-#   1: on
-#   2: off
-#   3: on
+# Channels not listed here default to off.  To start with all channels
+# off simply leave the channels mapping empty (or remove the file).
 
 channels:
-  1: off
-  2: off
-  3: off
-  4: off
-  5: off
-  6: off
-  7: off
-  8: off
+  # 1: on   # uncomment to start channel 1 in the ON state
+  # 2: on   # uncomment to start channel 2 in the ON state
