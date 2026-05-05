@@ -27,11 +27,13 @@ relay --driver gpiozero on 1
 from __future__ import annotations
 
 import logging
+import os
 
 import click
+import uvicorn
 
-from .waveshare import WaveshareRelayBoard, WaveshareRelayBoardRPiGPIO
 from .base import AbstractRelayBoard
+from .waveshare import WaveshareRelayBoard, WaveshareRelayBoardRPiGPIO
 
 logger = logging.getLogger(__name__)
 
@@ -180,4 +182,48 @@ def cmd_all_off(ctx: click.Context) -> None:
     board = _get_board(ctx.obj["driver"])
     board.turn_off_all()
     click.echo("All channels: OFF")
+
+
+@cli.command("serve")
+@click.option(
+    "--host",
+    default="0.0.0.0",
+    show_default=True,
+    help="Network interface to bind the API server to.",
+)
+@click.option(
+    "--port",
+    default=8000,
+    show_default=True,
+    type=int,
+    help="TCP port for the API server.",
+)
+@click.pass_context
+def cmd_serve(ctx: click.Context, host: str, port: int) -> None:
+    """Start the relay HTTP API daemon.
+
+    The selected GPIO driver is forwarded to the API process via the
+    ``RELAY_DRIVER`` environment variable so the lifespan startup picks
+    the correct backend without needing a second CLI flag.
+    """
+    driver = ctx.obj["driver"]
+    os.environ["RELAY_DRIVER"] = driver
+    logger.debug("Starting API server on %s:%d (driver=%s)", host, port, driver)
+    uvicorn.run("relay_tools.api:app", host=host, port=port)
+
+
+def serve_api() -> None:
+    """Standalone entry point for the ``relay-api`` command.
+
+    Starts the uvicorn server on ``0.0.0.0:8000``.  The API layer reads
+    the ``RELAY_DRIVER`` environment variable (default: ``"auto"``) during
+    startup to select the GPIO backend.  Set it before running this command
+    to choose a specific driver, e.g.::
+
+        RELAY_DRIVER=rpigpio relay-api
+
+    Use ``relay serve`` for full control over host, port, and driver from
+    the same CLI group.
+    """
+    uvicorn.run("relay_tools.api:app", host="0.0.0.0", port=8000)
 

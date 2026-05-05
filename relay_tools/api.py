@@ -4,8 +4,16 @@ Run with uvicorn
 ----------------
 uvicorn relay_tools.api:app --host 0.0.0.0 --port 8000
 
-Or via the helper entry-point:
-relay-tools-api
+Or via the CLI daemon subcommand:
+relay serve [--host HOST] [--port PORT] [--driver DRIVER]
+
+Or via the standalone entry-point:
+relay-api
+
+Environment variables
+---------------------
+RELAY_DRIVER  GPIO backend to use: "auto" (default), "rpigpio", or "gpiozero".
+              "auto" tries rpigpio first and falls back to gpiozero.
 
 Endpoints
 ---------
@@ -20,22 +28,75 @@ POST /relays/off            – turn all channels off
 
 from __future__ import annotations
 
+import os
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from .waveshare import WaveshareRelayBoard
+from .base import AbstractRelayBoard
+from .waveshare import WaveshareRelayBoard, WaveshareRelayBoardRPiGPIO
+
+# ---------------------------------------------------------------------------
+# Board factory
+# ---------------------------------------------------------------------------
+
+
+def _create_board(driver: str = "auto") -> AbstractRelayBoard:
+    """Instantiate the appropriate relay board backend.
+
+    Mirrors the auto-detection logic in :func:`relay_tools.cli._get_board`
+    but raises :class:`RuntimeError` (instead of a Click exception) so that
+    the error surfaces cleanly during FastAPI lifespan startup.
+
+    Args:
+        driver: ``"auto"`` tries rpigpio first and falls back to gpiozero.
+            ``"rpigpio"`` and ``"gpiozero"`` select the backend explicitly.
+
+    Raises:
+        RuntimeError: When the requested GPIO library is not installed.
+    """
+    if driver == "auto":
+        try:
+            return WaveshareRelayBoardRPiGPIO()
+        except ImportError:
+            pass
+        try:
+            return WaveshareRelayBoard()
+        except ImportError:
+            raise RuntimeError(
+                "No GPIO library found. "
+                "Install one with: pip install relay-tools[gpio]"
+            )
+
+    if driver == "rpigpio":
+        try:
+            return WaveshareRelayBoardRPiGPIO()
+        except ImportError:
+            raise RuntimeError(
+                "RPi.GPIO is not available. "
+                "Install it with: pip install relay-tools[gpio]"
+            )
+
+    # driver == "gpiozero"
+    try:
+        return WaveshareRelayBoard()
+    except ImportError:
+        raise RuntimeError(
+            "gpiozero is not available. "
+            "Install it with: pip install relay-tools[gpio]"
+        )
+
 
 # ---------------------------------------------------------------------------
 # Application state
 # ---------------------------------------------------------------------------
 
-_board: WaveshareRelayBoard | None = None
+_board: AbstractRelayBoard | None = None
 
 
-def _get_board() -> WaveshareRelayBoard:
+def _get_board() -> AbstractRelayBoard:
     if _board is None:  # pragma: no cover
         raise HTTPException(status_code=503, detail="Relay board not available.")
     return _board
@@ -44,7 +105,8 @@ def _get_board() -> WaveshareRelayBoard:
 @asynccontextmanager
 async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
     global _board
-    _board = WaveshareRelayBoard()
+    driver = os.environ.get("RELAY_DRIVER", "auto")
+    _board = _create_board(driver)
     try:
         yield
     finally:

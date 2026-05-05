@@ -66,8 +66,8 @@ def mock_board():
 
 @pytest.fixture()
 def client(mock_board):
-    """TestClient with WaveshareRelayBoard constructor mocked."""
-    with patch("relay_tools.api.WaveshareRelayBoard", return_value=mock_board):
+    """TestClient with _create_board mocked to return a board mock."""
+    with patch("relay_tools.api._create_board", return_value=mock_board):
         with TestClient(app, raise_server_exceptions=True) as c:
             yield c
 
@@ -131,3 +131,73 @@ class TestRelayAPI:
         assert resp.status_code == 200
         data = resp.json()
         assert not any(ch["on"] for ch in data["channels"])
+
+
+class TestCreateBoard:
+    """Unit tests for the _create_board factory function."""
+
+    def test_auto_uses_rpigpio_first(self) -> None:
+        from relay_tools.api import _create_board
+        mock_board = MagicMock()
+        with patch(
+            "relay_tools.api.WaveshareRelayBoardRPiGPIO", return_value=mock_board
+        ):
+            board = _create_board("auto")
+        assert board is mock_board
+
+    def test_auto_falls_back_to_gpiozero(self) -> None:
+        from relay_tools.api import _create_board
+        mock_board = MagicMock()
+        with (
+            patch(
+                "relay_tools.api.WaveshareRelayBoardRPiGPIO",
+                side_effect=ImportError("no RPi.GPIO"),
+            ),
+            patch("relay_tools.api.WaveshareRelayBoard", return_value=mock_board),
+        ):
+            board = _create_board("auto")
+        assert board is mock_board
+
+    def test_auto_raises_when_both_missing(self) -> None:
+        from relay_tools.api import _create_board
+        with (
+            patch(
+                "relay_tools.api.WaveshareRelayBoardRPiGPIO",
+                side_effect=ImportError("no RPi.GPIO"),
+            ),
+            patch(
+                "relay_tools.api.WaveshareRelayBoard",
+                side_effect=ImportError("no gpiozero"),
+            ),
+        ):
+            with pytest.raises(RuntimeError, match="No GPIO library"):
+                _create_board("auto")
+
+    def test_rpigpio_raises_when_missing(self) -> None:
+        from relay_tools.api import _create_board
+        with patch(
+            "relay_tools.api.WaveshareRelayBoardRPiGPIO",
+            side_effect=ImportError("no RPi.GPIO"),
+        ):
+            with pytest.raises(RuntimeError, match="RPi.GPIO"):
+                _create_board("rpigpio")
+
+    def test_gpiozero_raises_when_missing(self) -> None:
+        from relay_tools.api import _create_board
+        with patch(
+            "relay_tools.api.WaveshareRelayBoard",
+            side_effect=ImportError("no gpiozero"),
+        ):
+            with pytest.raises(RuntimeError, match="gpiozero"):
+                _create_board("gpiozero")
+
+    def test_lifespan_reads_relay_driver_env(self, monkeypatch) -> None:
+        """_lifespan passes RELAY_DRIVER env var to _create_board."""
+        monkeypatch.setenv("RELAY_DRIVER", "rpigpio")
+        mock_board = MagicMock()
+        with patch(
+            "relay_tools.api._create_board", return_value=mock_board
+        ) as mock_factory:
+            with TestClient(app, raise_server_exceptions=True):
+                pass
+        mock_factory.assert_called_once_with("rpigpio")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -250,3 +251,43 @@ class TestGetBoard:
         ):
             with pytest.raises(click.ClickException):
                 _get_board("auto")
+
+
+# ---------------------------------------------------------------------------
+# relay serve tests
+# ---------------------------------------------------------------------------
+
+
+class TestServeCommand:
+    def test_serve_default_host_and_port(self, runner) -> None:
+        """relay serve starts uvicorn on 0.0.0.0:8000 by default."""
+        with patch("relay_tools.cli.uvicorn") as mock_uvicorn:
+            result = runner.invoke(cli, ["serve"])
+        assert result.exit_code == 0
+        mock_uvicorn.run.assert_called_once_with(
+            "relay_tools.api:app", host="0.0.0.0", port=8000
+        )
+
+    def test_serve_custom_host_and_port(self, runner) -> None:
+        """--host and --port are forwarded to uvicorn.run."""
+        with patch("relay_tools.cli.uvicorn") as mock_uvicorn:
+            result = runner.invoke(
+                cli, ["serve", "--host", "127.0.0.1", "--port", "9000"]
+            )
+        assert result.exit_code == 0
+        mock_uvicorn.run.assert_called_once_with(
+            "relay_tools.api:app", host="127.0.0.1", port=9000
+        )
+
+    def test_serve_sets_relay_driver_env_auto(self, runner, monkeypatch) -> None:
+        """Default driver 'auto' is written to RELAY_DRIVER env var."""
+        monkeypatch.delenv("RELAY_DRIVER", raising=False)
+        with patch("relay_tools.cli.uvicorn"):
+            runner.invoke(cli, ["serve"])
+        assert os.environ.get("RELAY_DRIVER") == "auto"
+
+    def test_serve_sets_relay_driver_env_explicit(self, runner) -> None:
+        """Explicit --driver value is written to RELAY_DRIVER env var."""
+        with patch("relay_tools.cli.uvicorn"):
+            runner.invoke(cli, ["--driver", "rpigpio", "serve"])
+        assert os.environ.get("RELAY_DRIVER") == "rpigpio"

@@ -30,6 +30,7 @@ dev = [
 
 [project.scripts]
 relay = "relay_tools.cli:cli"
+relay-api = "relay_tools.cli:serve_api"
 
 [tool.setuptools.packages.find]
 where = ["."]
