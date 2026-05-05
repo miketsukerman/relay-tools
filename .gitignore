@@ -201,6 +201,17 @@ cython_debug/
 .cursorignore
 .cursorindexingignore
 
+# Debian packaging build artifacts
+.pybuild/
+debian/.debhelper/
+debian/debhelper-build-stamp
+debian/files
+debian/relay-tools/
+debian/relay-tools.substvars
+debian/relay-tools.postinst.debhelper
+debian/relay-tools.postrm.debhelper
+debian/relay-tools.prerm.debhelper
+
 # Marimo
 marimo/_static/
 marimo/_lsp/
