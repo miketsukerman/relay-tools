@@ -1,0 +1,14 @@
+#!/usr/bin/make -f
+export PYBUILD_NAME = relay-tools
+export DEB_BUILD_OPTIONS += nocheck
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_install:
+	dh_install
+	install -D -m 0644 systemd/channels.yaml \
+		debian/relay-tools/etc/relay/channels.yaml.example
+
+override_dh_installsystemd:
+	dh_installsystemd --name=relay-daemon

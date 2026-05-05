@@ -1,0 +1,51 @@
+name: Build Debian Package
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-deb:
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            build-essential \
+            debhelper \
+            dh-python \
+            python3-all \
+            pybuild-plugin-pyproject \
+            python3-build \
+            python3-installer \
+            python3-click \
+            python3-yaml \
+            python3-fastapi \
+            python3-httpx \
+            python3-uvicorn
+
+      - name: Update changelog version
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          DATE=$(date -R)
+          sed -i "1s/.*/relay-tools (${VERSION}-1) unstable; urgency=medium/" debian/changelog
+          sed -i "s|^ -- .*$| -- Mike Tsukerman <miketsukerman@users.noreply.github.com>  ${DATE}|" \
+            debian/changelog
+
+      - name: Build Debian package
+        run: dpkg-buildpackage -us -uc -b
+
+      - name: Collect artifacts
+        run: |
+          mkdir -p dist
+          mv ../*.deb dist/
+
+      - name: Upload .deb to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*.deb

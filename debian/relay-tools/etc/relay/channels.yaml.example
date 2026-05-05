@@ -1,0 +1,25 @@
+# /etc/relay/channels.yaml
+#
+# Per-channel initial state configuration for the relay-tools daemon.
+#
+# The daemon reads this file on startup and sets each channel to the
+# state listed here.  Any channel not listed defaults to OFF.
+#
+# Valid state values: on / off  (or YAML booleans: true / false)
+#
+# Channel numbering follows the Waveshare RPi Relay Board (B):
+#   Channel 1 → BCM 5
+#   Channel 2 → BCM 6
+#   Channel 3 → BCM 13
+#   Channel 4 → BCM 16
+#   Channel 5 → BCM 19
+#   Channel 6 → BCM 20
+#   Channel 7 → BCM 21
+#   Channel 8 → BCM 26
+#
+# Channels not listed here default to off.  To start with all channels
+# off simply leave the channels mapping empty (or remove the file).
+
+channels:
+  # 1: on   # uncomment to start channel 1 in the ON state
+  # 2: on   # uncomment to start channel 2 in the ON state

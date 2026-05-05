@@ -1,0 +1,33 @@
+Source: relay-tools
+Section: python
+Priority: optional
+Maintainer: Mike Tsukerman <miketsukerman@users.noreply.github.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ dh-python,
+ python3-all,
+ pybuild-plugin-pyproject,
+ python3-build,
+ python3-installer,
+Standards-Version: 4.6.2
+Homepage: https://github.com/miketsukerman/relay-tools
+Rules-Requires-Root: no
+
+Package: relay-tools
+Architecture: all
+Depends:
+ ${python3:Depends},
+ ${misc:Depends},
+ python3-click,
+ python3-yaml,
+ python3-fastapi,
+ python3-httpx,
+ python3-uvicorn,
+Description: Tooling for Waveshare Raspberry Pi relay hats
+ relay-tools provides CLI utilities and an HTTP API for controlling
+ Waveshare Raspberry Pi relay hats.
+ .
+ It supports the Waveshare RPi Relay Board (B) and provides:
+  - Direct relay control commands (on, off, toggle, status)
+  - A FastAPI-based HTTP API daemon
+  - A systemd service unit for automatic startup
