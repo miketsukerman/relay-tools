@@ -103,7 +103,7 @@ class TestCLI:
         board = _make_board()
         result = self._run(runner, board, "press", "1", "--duration", "0")
         assert result.exit_code != 0
-        assert "0.01<=x" in result.output
+        assert "x>=0.01" in result.output
         board.turn_on.assert_not_called()
         board.turn_off.assert_not_called()
 
