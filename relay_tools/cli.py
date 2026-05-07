@@ -161,7 +161,7 @@ def toggle(ctx: click.Context, channel: int) -> None:
 @click.argument("channel", type=int)
 @click.option(
     "--duration",
-    type=click.FloatRange(min=0.0),
+    type=click.FloatRange(min=0.01),
     default=0.2,
     show_default=True,
     help="Seconds to keep the relay on before switching it off.",
@@ -172,8 +172,10 @@ def press(ctx: click.Context, channel: int, duration: float) -> None:
     logger.debug("Pressing channel %d for %.3f seconds", channel, duration)
     board = _get_board(ctx.obj["driver"])
     board.turn_on(channel)
-    time.sleep(duration)
-    board.turn_off(channel)
+    try:
+        time.sleep(duration)
+    finally:
+        board.turn_off(channel)
     click.echo(f"Channel {channel}: PRESSED")
 
 

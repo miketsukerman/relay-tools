@@ -99,6 +99,14 @@ class TestCLI:
         board.turn_off.assert_called_once_with(5)
         mock_sleep.assert_called_once_with(0.2)
 
+    def test_press_rejects_zero_duration(self, runner) -> None:
+        board = _make_board()
+        result = self._run(runner, board, "press", "1", "--duration", "0")
+        assert result.exit_code != 0
+        assert "0.01<=x" in result.output
+        board.turn_on.assert_not_called()
+        board.turn_off.assert_not_called()
+
     def test_status_command(self, runner) -> None:
         board = _make_board()
         result = self._run(runner, board, "status")
