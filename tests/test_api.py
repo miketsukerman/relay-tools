@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from fastapi.testclient import TestClient
@@ -121,13 +121,15 @@ class TestRelayAPI:
         assert resp.json()["on"] is False
 
     def test_channel_press(self, client, mock_board) -> None:
-        with patch("relay_tools.api.time.sleep") as mock_sleep:
+        with patch(
+            "relay_tools.api.asyncio.sleep", new_callable=AsyncMock
+        ) as mock_sleep:
             resp = client.post("/relays/4/press")
         assert resp.status_code == 200
         assert resp.json() == {"channel": 4, "on": False}
         mock_board.turn_on.assert_any_call(4)
         mock_board.turn_off.assert_any_call(4)
-        mock_sleep.assert_called_once_with(0.2)
+        mock_sleep.assert_awaited_once_with(0.2)
 
     def test_channel_press_invalid(self, client, mock_board) -> None:
         mock_board.turn_on.side_effect = ValueError("out of range")

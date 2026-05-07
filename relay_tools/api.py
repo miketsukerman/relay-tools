@@ -32,8 +32,8 @@ POST /relays/off            – turn all channels off
 
 from __future__ import annotations
 
+import asyncio
 import os
-import time
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
@@ -243,7 +243,7 @@ def channel_toggle(channel: int) -> ChannelState:
     response_model=ChannelState,
     summary="Momentarily press a channel",
 )
-def channel_press(
+async def channel_press(
     channel: int, duration: float = Query(default=0.2, ge=0.01, le=10.0)
 ) -> ChannelState:
     """Momentarily activate relay *channel* (on, hold, then off)."""
@@ -251,7 +251,7 @@ def channel_press(
     try:
         board.turn_on(channel)
         try:
-            time.sleep(duration)
+            await asyncio.sleep(duration)
         finally:
             board.turn_off(channel)
         return ChannelState(channel=channel, on=False)
