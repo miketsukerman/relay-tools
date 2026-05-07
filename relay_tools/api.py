@@ -139,7 +139,7 @@ async def _lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(
     title="relay-tools API",
     description="REST API to control the Waveshare RPi Relay Board (B).",
-    version="0.1.0",
+    version="0.1.1",
     lifespan=_lifespan,
 )
 
