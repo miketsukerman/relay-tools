@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import logging
 import os
+import time
 
 import click
 import uvicorn
@@ -158,12 +159,20 @@ def toggle(ctx: click.Context, channel: int) -> None:
 
 @cli.command()
 @click.argument("channel", type=int)
+@click.option(
+    "--duration",
+    type=click.FloatRange(min=0.0),
+    default=0.2,
+    show_default=True,
+    help="Seconds to keep the relay on before switching it off.",
+)
 @click.pass_context
-def press(ctx: click.Context, channel: int) -> None:
+def press(ctx: click.Context, channel: int, duration: float) -> None:
     """Momentarily press relay CHANNEL (on, then off)."""
-    logger.debug("Pressing channel %d", channel)
+    logger.debug("Pressing channel %d for %.3f seconds", channel, duration)
     board = _get_board(ctx.obj["driver"])
     board.turn_on(channel)
+    time.sleep(duration)
     board.turn_off(channel)
     click.echo(f"Channel {channel}: PRESSED")
 

@@ -91,11 +91,13 @@ class TestCLI:
 
     def test_press_command(self, runner) -> None:
         board = _make_board()
-        result = self._run(runner, board, "press", "5")
+        with patch("relay_tools.cli.time.sleep") as mock_sleep:
+            result = self._run(runner, board, "press", "5")
         assert result.exit_code == 0
         assert "PRESSED" in result.output
         board.turn_on.assert_called_once_with(5)
         board.turn_off.assert_called_once_with(5)
+        mock_sleep.assert_called_once_with(0.2)
 
     def test_status_command(self, runner) -> None:
         board = _make_board()
