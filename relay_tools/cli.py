@@ -11,6 +11,9 @@ relay off 3
 # Toggle channel 2
 relay toggle 2
 
+# Press channel 2 (momentary ON then OFF)
+relay press 2
+
 # Show state of all channels
 relay status
 
@@ -154,6 +157,18 @@ def toggle(ctx: click.Context, channel: int) -> None:
 
 
 @cli.command()
+@click.argument("channel", type=int)
+@click.pass_context
+def press(ctx: click.Context, channel: int) -> None:
+    """Momentarily press relay CHANNEL (on, then off)."""
+    logger.debug("Pressing channel %d", channel)
+    board = _get_board(ctx.obj["driver"])
+    board.turn_on(channel)
+    board.turn_off(channel)
+    click.echo(f"Channel {channel}: PRESSED")
+
+
+@cli.command()
 @click.pass_context
 def status(ctx: click.Context) -> None:
     """Print the state of every relay channel."""
@@ -248,4 +263,3 @@ def serve_api() -> None:
     the same CLI group.
     """
     uvicorn.run("relay_tools.api:app", host="0.0.0.0", port=8000)
-

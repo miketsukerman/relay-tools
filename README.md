@@ -68,6 +68,9 @@ relay off 3
 # Toggle channel 2
 relay toggle 2
 
+# Press channel 2 (momentary ON then OFF)
+relay press 2
+
 # Show the state of all channels
 relay status
 
