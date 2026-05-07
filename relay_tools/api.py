@@ -25,6 +25,7 @@ GET  /relays/{channel}      – state of a single channel
 POST /relays/{channel}/on   – turn channel on
 POST /relays/{channel}/off  – turn channel off
 POST /relays/{channel}/toggle – toggle channel
+POST /relays/{channel}/press  – momentarily press channel
 POST /relays/on             – turn all channels on
 POST /relays/off            – turn all channels off
 """
@@ -32,10 +33,11 @@ POST /relays/off            – turn all channels off
 from __future__ import annotations
 
 import os
+import time
 from contextlib import asynccontextmanager
 from typing import AsyncIterator
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
 from .base import AbstractRelayBoard
@@ -232,6 +234,27 @@ def channel_toggle(channel: int) -> ChannelState:
             board.turn_on(channel)
             active = True
         return ChannelState(channel=channel, on=active)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@app.post(
+    "/relays/{channel}/press",
+    response_model=ChannelState,
+    summary="Momentarily press a channel",
+)
+def channel_press(
+    channel: int, duration: float = Query(default=0.2, ge=0.01, le=10.0)
+) -> ChannelState:
+    """Momentarily activate relay *channel* (on, hold, then off)."""
+    board = _get_board()
+    try:
+        board.turn_on(channel)
+        try:
+            time.sleep(duration)
+        finally:
+            board.turn_off(channel)
+        return ChannelState(channel=channel, on=False)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 

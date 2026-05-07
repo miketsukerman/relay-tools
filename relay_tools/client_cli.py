@@ -15,6 +15,9 @@ relay-client off 3
 # Toggle channel 2
 relay-client toggle 2
 
+# Press channel 2 (momentary ON then OFF)
+relay-client press 2
+
 # Show state of all channels
 relay-client status
 
@@ -154,6 +157,30 @@ def cmd_toggle(ctx: click.Context, channel: int) -> None:
         raise _connection_error(url)
     state = "ON" if data["on"] else "OFF"
     click.echo(f"Channel {data['channel']}: {state}")
+
+
+@client_cli.command("press")
+@click.argument("channel", type=int)
+@click.option(
+    "--duration",
+    type=click.FloatRange(min=0.01),
+    default=0.2,
+    show_default=True,
+    help="Seconds to keep the relay on before switching it off.",
+)
+@click.pass_context
+def cmd_press(ctx: click.Context, channel: int, duration: float) -> None:
+    """Momentarily press relay CHANNEL (on, hold, then off)."""
+    url = ctx.obj["url"]
+    logger.debug("POST %s/relays/%d/press?duration=%.3f", url, channel, duration)
+    try:
+        with _client(url) as client:
+            data = _handle_response(
+                client.post(f"/relays/{channel}/press", params={"duration": duration})
+            )
+    except httpx.ConnectError:
+        raise _connection_error(url)
+    click.echo(f"Channel {data['channel']}: PRESSED")
 
 
 @client_cli.command("status")

@@ -100,6 +100,7 @@ uvicorn relay_tools.api:app --host 0.0.0.0 --port 8000
 | POST   | `/relays/{channel}/on`      | Turn a channel on               |
 | POST   | `/relays/{channel}/off`     | Turn a channel off              |
 | POST   | `/relays/{channel}/toggle`  | Toggle a channel                |
+| POST   | `/relays/{channel}/press`   | Momentarily press a channel     |
 | POST   | `/relays/on`                | Turn all channels on            |
 | POST   | `/relays/off`               | Turn all channels off           |
 
@@ -116,6 +117,12 @@ curl -X POST http://localhost:8000/relays/1/off
 
 # Toggle channel 2
 curl -X POST http://localhost:8000/relays/2/toggle
+
+# Press channel 2 (default hold duration: 0.2s)
+curl -X POST http://localhost:8000/relays/2/press
+
+# Press channel 2 with custom hold duration
+curl -X POST "http://localhost:8000/relays/2/press?duration=0.5"
 
 # Get state of all channels
 curl http://localhost:8000/relays

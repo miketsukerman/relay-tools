@@ -134,6 +134,33 @@ class TestClientCLIChannelCommands:
         assert result.exit_code == 0
         assert "Channel 4: ON" in result.output
 
+    def test_press_command(self, runner: CliRunner) -> None:
+        transport = _make_transport(
+            {
+                ("POST", "/relays/5/press"): httpx.Response(
+                    200, json=_channel_state(5, False)
+                )
+            }
+        )
+        result = _run(runner, transport, "press", "5")
+        assert result.exit_code == 0
+        assert "Channel 5: PRESSED" in result.output
+
+    def test_press_command_with_custom_duration(self, runner: CliRunner) -> None:
+        with patch("relay_tools.client_cli._client") as mock_factory:
+            mock_client = mock_factory.return_value.__enter__.return_value
+            mock_factory.return_value.__exit__ = lambda s, *a: None
+            mock_client.post.return_value = httpx.Response(
+                200, request=httpx.Request("POST", "http://localhost/relays/6/press"),
+                json=_channel_state(6, False)
+            )
+            result = runner.invoke(client_cli, ["press", "6", "--duration", "0.5"])
+        assert result.exit_code == 0
+        assert "Channel 6: PRESSED" in result.output
+        mock_client.post.assert_called_once_with(
+            "/relays/6/press", params={"duration": 0.5}
+        )
+
     def test_status_command(self, runner: CliRunner) -> None:
         transport = _make_transport(
             {("GET", "/relays"): httpx.Response(200, json=_board_state())}
