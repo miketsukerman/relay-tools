@@ -172,7 +172,9 @@ def cmd_toggle(ctx: click.Context, channel: int) -> None:
 def cmd_press(ctx: click.Context, channel: int, duration: float) -> None:
     """Momentarily press relay CHANNEL (on, hold, then off)."""
     url = ctx.obj["url"]
-    logger.debug("POST %s/relays/%d/press?duration=%.3f", url, channel, duration)
+    logger.debug(
+        "POST %s/relays/%d/press (duration=%.3f)", url, channel, duration
+    )
     try:
         with _client(url) as client:
             data = _handle_response(
