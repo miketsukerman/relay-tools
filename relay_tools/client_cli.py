@@ -36,11 +36,16 @@ from __future__ import annotations
 import logging
 
 import click
-import httpx
+
+from .client import (
+    DEFAULT_URL,
+    RelayClient,
+    RelayClientError,
+)
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_URL = "http://localhost:8000"
+_DEFAULT_URL = DEFAULT_URL
 
 
 # ---------------------------------------------------------------------------
@@ -48,32 +53,9 @@ _DEFAULT_URL = "http://localhost:8000"
 # ---------------------------------------------------------------------------
 
 
-def _client(url: str) -> httpx.Client:
-    """Return an :class:`httpx.Client` pointed at *url*."""
-    return httpx.Client(base_url=url)
-
-
-def _handle_response(resp: httpx.Response) -> dict:
-    """Raise a :class:`click.ClickException` on HTTP errors; return JSON body."""
-    try:
-        resp.raise_for_status()
-    except httpx.HTTPStatusError as exc:
-        detail = exc.response.text
-        try:
-            detail = exc.response.json().get("detail", detail)
-        except Exception:
-            pass
-        raise click.ClickException(
-            f"Daemon returned HTTP {exc.response.status_code}: {detail}"
-        ) from exc
-    return resp.json()
-
-
-def _connection_error(url: str) -> click.ClickException:
-    return click.ClickException(
-        f"Could not connect to relay daemon at {url}.\n"
-        "Make sure the daemon is running: relay serve"
-    )
+def _client(url: str) -> RelayClient:
+    """Return a reusable relay daemon client."""
+    return RelayClient(url)
 
 
 # ---------------------------------------------------------------------------
@@ -119,13 +101,13 @@ def client_cli(ctx: click.Context, url: str, verbose: bool) -> None:
 def cmd_on(ctx: click.Context, channel: int) -> None:
     """Turn relay CHANNEL on (close the contact)."""
     url = ctx.obj["url"]
-    logger.debug("POST %s/relays/%d/on", url, channel)
+    logger.debug("relay-client on %d via %s", channel, url)
     try:
         with _client(url) as client:
-            data = _handle_response(client.post(f"/relays/{channel}/on"))
-    except httpx.ConnectError:
-        raise _connection_error(url)
-    click.echo(f"Channel {data['channel']}: ON")
+            data = client.on(channel)
+    except RelayClientError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Channel {data.channel}: ON")
 
 
 @client_cli.command("off")
@@ -134,13 +116,13 @@ def cmd_on(ctx: click.Context, channel: int) -> None:
 def cmd_off(ctx: click.Context, channel: int) -> None:
     """Turn relay CHANNEL off (open the contact)."""
     url = ctx.obj["url"]
-    logger.debug("POST %s/relays/%d/off", url, channel)
+    logger.debug("relay-client off %d via %s", channel, url)
     try:
         with _client(url) as client:
-            data = _handle_response(client.post(f"/relays/{channel}/off"))
-    except httpx.ConnectError:
-        raise _connection_error(url)
-    click.echo(f"Channel {data['channel']}: OFF")
+            data = client.off(channel)
+    except RelayClientError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Channel {data.channel}: OFF")
 
 
 @client_cli.command("toggle")
@@ -149,14 +131,14 @@ def cmd_off(ctx: click.Context, channel: int) -> None:
 def cmd_toggle(ctx: click.Context, channel: int) -> None:
     """Toggle relay CHANNEL."""
     url = ctx.obj["url"]
-    logger.debug("POST %s/relays/%d/toggle", url, channel)
+    logger.debug("relay-client toggle %d via %s", channel, url)
     try:
         with _client(url) as client:
-            data = _handle_response(client.post(f"/relays/{channel}/toggle"))
-    except httpx.ConnectError:
-        raise _connection_error(url)
-    state = "ON" if data["on"] else "OFF"
-    click.echo(f"Channel {data['channel']}: {state}")
+            data = client.toggle(channel)
+    except RelayClientError as exc:
+        raise click.ClickException(str(exc)) from exc
+    state = "ON" if data.on else "OFF"
+    click.echo(f"Channel {data.channel}: {state}")
 
 
 @client_cli.command("press")
@@ -172,17 +154,13 @@ def cmd_toggle(ctx: click.Context, channel: int) -> None:
 def cmd_press(ctx: click.Context, channel: int, duration: float) -> None:
     """Momentarily press relay CHANNEL (on, hold, then off)."""
     url = ctx.obj["url"]
-    logger.debug(
-        "POST %s/relays/%d/press (duration=%.3f)", url, channel, duration
-    )
+    logger.debug("relay-client press %d via %s (duration=%.3f)", channel, url, duration)
     try:
         with _client(url) as client:
-            data = _handle_response(
-                client.post(f"/relays/{channel}/press", params={"duration": duration})
-            )
-    except httpx.ConnectError:
-        raise _connection_error(url)
-    click.echo(f"Channel {data['channel']}: PRESSED")
+            data = client.press(channel, duration)
+    except RelayClientError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Channel {data.channel}: PRESSED")
 
 
 @client_cli.command("status")
@@ -190,15 +168,15 @@ def cmd_press(ctx: click.Context, channel: int, duration: float) -> None:
 def cmd_status(ctx: click.Context) -> None:
     """Print the state of every relay channel."""
     url = ctx.obj["url"]
-    logger.debug("GET %s/relays", url)
+    logger.debug("relay-client status via %s", url)
     try:
         with _client(url) as client:
-            data = _handle_response(client.get("/relays"))
-    except httpx.ConnectError:
-        raise _connection_error(url)
-    for ch in data["channels"]:
-        label = "ON " if ch["on"] else "OFF"
-        click.echo(f"  Channel {ch['channel']:>2}: {label}")
+            data = client.status()
+    except RelayClientError as exc:
+        raise click.ClickException(str(exc)) from exc
+    for ch in data.channels:
+        label = "ON " if ch.on else "OFF"
+        click.echo(f"  Channel {ch.channel:>2}: {label}")
 
 
 @client_cli.command("all-on")
@@ -206,12 +184,12 @@ def cmd_status(ctx: click.Context) -> None:
 def cmd_all_on(ctx: click.Context) -> None:
     """Turn ALL relay channels on."""
     url = ctx.obj["url"]
-    logger.debug("POST %s/relays/on", url)
+    logger.debug("relay-client all-on via %s", url)
     try:
         with _client(url) as client:
-            _handle_response(client.post("/relays/on"))
-    except httpx.ConnectError:
-        raise _connection_error(url)
+            client.all_on()
+    except RelayClientError as exc:
+        raise click.ClickException(str(exc)) from exc
     click.echo("All channels: ON")
 
 
@@ -220,12 +198,12 @@ def cmd_all_on(ctx: click.Context) -> None:
 def cmd_all_off(ctx: click.Context) -> None:
     """Turn ALL relay channels off."""
     url = ctx.obj["url"]
-    logger.debug("POST %s/relays/off", url)
+    logger.debug("relay-client all-off via %s", url)
     try:
         with _client(url) as client:
-            _handle_response(client.post("/relays/off"))
-    except httpx.ConnectError:
-        raise _connection_error(url)
+            client.all_off()
+    except RelayClientError as exc:
+        raise click.ClickException(str(exc)) from exc
     click.echo("All channels: OFF")
 
 

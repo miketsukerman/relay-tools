@@ -1,0 +1,2 @@
+systemd/channels.yaml usr/share/relay-tools/examples/
+systemd/rom2820-board.yaml usr/share/relay-tools/examples/

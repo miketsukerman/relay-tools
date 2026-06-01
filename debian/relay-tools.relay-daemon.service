@@ -5,9 +5,11 @@
 # 1. Copy this file to the systemd system directory:
 #       sudo cp relay-daemon.service /etc/systemd/system/
 #
-# 2. Copy the sample channel config (edit to taste):
+# 2. Copy the sample configs (edit to taste):
 #       sudo mkdir -p /etc/relay
 #       sudo cp channels.yaml /etc/relay/channels.yaml
+#       sudo mkdir -p /etc/relay/boards.d
+#       sudo cp rom2820-board.yaml /etc/relay/boards.d/rom2820.yaml
 #
 # 3. Reload the systemd manager:
 #       sudo systemctl daemon-reload
@@ -35,6 +37,7 @@
 #   - Force a specific driver:   Environment=RELAY_DRIVER=rpigpio
 #   - Bind to localhost only:    ExecStart=… --host 127.0.0.1
 #   - Use a different config:    Environment=RELAY_CONFIG=/etc/relay/custom.yaml
+#   - Board CLI profile path:    export RELAY_BOARD_CONFIG=/etc/relay/boards.d/rom2820.yaml
 #
 # Requirements
 # ------------
@@ -62,6 +65,7 @@ User=root
 
 # Ensure the config directory exists before starting.
 ExecStartPre=-/bin/mkdir -p /etc/relay
+ExecStartPre=-/bin/mkdir -p /etc/relay/boards.d
 
 # Path to the relay CLI entry point installed by pip.
 # Adjust if you installed into a virtualenv, e.g.:
@@ -75,6 +79,9 @@ Environment=RELAY_DRIVER=auto
 # Path to the per-channel initial-state config file.  All channels start
 # OFF if the file is absent; channels not listed also default to OFF.
 Environment=RELAY_CONFIG=/etc/relay/channels.yaml
+
+# Optional default profile path for relay-board operators:
+# Environment=RELAY_BOARD_CONFIG=/etc/relay/boards.d/rom2820.yaml
 
 # Restart the daemon automatically if it crashes.
 Restart=on-failure
