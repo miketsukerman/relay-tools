@@ -503,11 +503,12 @@ class BoardController:
             time.sleep(duration)
             self._set_relay_state(signal.channel, True)
         if verify:
-            self._assert_signal_state(
+            self._assert_target_state(
                 signal,
                 expected=False,
                 step_name=step.name,
                 recovery_hint=step.recovery_hint,
+                target_kind="signal",
             )
         return ExecutedStep(
             step.name,
