@@ -115,6 +115,11 @@ relay-board status
 board-health condition. Use `--verify` (default from the board profile) to read
 relay state back after each step.
 
+For full board profile schema details, worked YAML examples, action reference,
+and workflow tutorials, see:
+
+- [`docs/board-yaml-format.md`](docs/board-yaml-format.md)
+
 ---
 
 ## REST API
