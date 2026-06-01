@@ -49,7 +49,7 @@
 
 [Unit]
 Description=relay-tools HTTP API daemon
-Documentation=https://github.com/miketsukerman/relay-tools
+Documentation=https://github.com/Advantech-EECC/relay-tools
 After=network.target
 Wants=network.target
 
