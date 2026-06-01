@@ -34,7 +34,7 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           DATE=$(date -R)
           sed -i "1s/.*/relay-tools (${VERSION}-1) unstable; urgency=medium/" debian/changelog
-          sed -i "s|^ -- .*$| -- Mike Tsukerman <miketsukerman@users.noreply.github.com>  ${DATE}|" \
+          sed -i "s|^ -- .*$| -- Mikhail Tsukerman <mikhail.tsukerman@advantech.de>  ${DATE}|" \
             debian/changelog
 
       - name: Build Debian package

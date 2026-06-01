@@ -1,5 +1,5 @@
-relay-tools (0.1.0-1) unstable; urgency=medium
+relay-tools (0.1.2) unstable; urgency=medium
 
   * Initial Debian package.
 
- -- Mike Tsukerman <miketsukerman@users.noreply.github.com>  Mon, 05 May 2026 14:45:00 +0000
+ -- Mikhail Tsukerman <mikhail.tsukerman@advantech.com>  Mon, 05 May 2026 14:45:00 +0000

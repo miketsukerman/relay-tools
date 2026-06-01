@@ -300,7 +300,7 @@ conflicting channel mappings.
 ## ROM2820 profile notes
 
 The repository now ships a ROM2820 sample profile at
-`/tmp/workspace/miketsukerman/relay-tools/systemd/rom2820-board.yaml` and, in
+`systemd/rom2820-board.yaml` and, in
 Debian packages, under `/usr/share/relay-tools/examples/rom2820-board.yaml`.
 
 The current sample models the supplied ROM2820 controls as maintained switches:

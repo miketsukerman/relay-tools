@@ -1,10 +1,10 @@
 Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
 Upstream-Name: relay-tools
-Upstream-Contact: Mike Tsukerman <miketsukerman@users.noreply.github.com>
-Source: https://github.com/miketsukerman/relay-tools
+Upstream-Contact: Mikhail Tsukerman <mikhail.tsukerman@advantech.com>
+Source: https://github.com/Advantech-EECC/relay-tools
 
 Files: *
-Copyright: 2024-2026 Mike Tsukerman
+Copyright: 2024-2026 Mikhail Tsukerman
 License: Apache-2.0
 
 License: Apache-2.0
