@@ -77,6 +77,13 @@ boot_modes:
 # Optional named workflows can be added here once reset mapping and any
 # additional timing values are known.
 # workflows:
+#   flash-internal-memory:
+#     - name: flash:set-emmc-mode
+#       action: set-boot-mode
+#       boot_mode: emmc
+#     - name: flash:power-cycle
+#       action: delay
+#       timing: settle_delay
 #   power-force-off:
 #     - action: set
 #       switch: general_power_input

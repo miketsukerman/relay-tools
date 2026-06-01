@@ -108,6 +108,12 @@ relay-board set-boot-mode emmc
 # Apply a boot mode, execute the boot workflow, then exit
 relay-board boot-and-wait emmc
 
+# Run a custom workflow by name
+relay-board run-workflow flash-internal-memory
+
+# Run the standard eMMC flashing workflow name
+relay-board flash-internal-memory
+
 # Override the daemon URL or board profile path
 RELAY_API_URL=http://pi.local:8000 \
 RELAY_BOARD_CONFIG=/etc/relay/boards.d/rom2820.yaml \

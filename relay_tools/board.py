@@ -271,6 +271,18 @@ class BoardController:
             )
         return self._execute_steps(tuple(steps), verify=verify, force=force)
 
+    def flash_internal_memory(
+        self,
+        *,
+        verify: bool,
+        force: bool = False,
+    ) -> WorkflowResult:
+        return self.run_workflow(
+            "flash-internal-memory",
+            verify=verify,
+            force=force,
+        )
+
     def boot_and_wait(
         self,
         mode_name: str,
