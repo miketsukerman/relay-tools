@@ -1,6 +1,6 @@
 # relay-tools
 
-[![Tests](https://github.com/miketsukerman/relay-tools/actions/workflows/tests.yml/badge.svg)](https://github.com/miketsukerman/relay-tools/actions/workflows/tests.yml)
+[![Tests](https://github.com/Advantech-EECC/relay-tools/actions/workflows/tests.yml/badge.svg)](https://github.com/Advantech-EECC/relay-tools/actions/workflows/tests.yml)
 
 Python package for controlling relay hats on Raspberry Pi.
 Includes support for the [Waveshare RPi Relay Board (B)](https://www.waveshare.com/wiki/RPi_Relay_Board_(B))
