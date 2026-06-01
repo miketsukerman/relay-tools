@@ -50,8 +50,8 @@ class _RecordingTransport(httpx.MockTransport):
         return httpx.Response(200, json={"channel": channel, "on": False})
 
 
-def _write_profile(tmp_path):
-    path = tmp_path / "board.yaml"
+def _write_profile(tmp_path, name: str = "board.yaml"):
+    path = tmp_path / name
     path.write_text(
         """
 name: rom2820
@@ -82,7 +82,13 @@ boot_modes:
     return path
 
 
-def _run(runner: CliRunner, transport: _RecordingTransport, profile_path, *args: str):
+def _run(
+    runner: CliRunner,
+    transport: _RecordingTransport,
+    profile_path,
+    *args: str,
+    include_config_option: bool = True,
+):
     with patch("relay_tools.board_cli._client") as mock_client_factory:
         client = RelayClient(
             DEFAULT_URL,
@@ -92,9 +98,12 @@ def _run(runner: CliRunner, transport: _RecordingTransport, profile_path, *args:
             ),
         )
         mock_client_factory.return_value = client
+        cli_args = list(args)
+        if include_config_option:
+            cli_args = ["--config", str(profile_path), *cli_args]
         return runner.invoke(
             board_cli,
-            ["--config", str(profile_path), *args],
+            cli_args,
         )
 
 
@@ -162,3 +171,51 @@ def test_boot_and_wait_runs_boot_mode_then_power_sequence(
         ("POST", "/relays/5/on"),
     ]
     assert delays == [0.5, 1.5]
+
+
+def test_config_name_resolves_profile_from_default_directory(tmp_path) -> None:
+    runner = CliRunner()
+    transport = _RecordingTransport()
+    profile = _write_profile(tmp_path, "lab.yaml")
+
+    with patch(
+        "relay_tools.board_cli.DEFAULT_BOARD_CONFIG",
+        str(tmp_path / "default.yaml"),
+    ):
+        result = _run(
+            runner,
+            transport,
+            profile,
+            "lab",
+            "status",
+            include_config_option=False,
+        )
+
+    assert result.exit_code == 0
+    assert "Matching boot modes: emmc" in result.output
+
+
+def test_config_name_and_config_option_are_mutually_exclusive(tmp_path) -> None:
+    runner = CliRunner()
+    transport = _RecordingTransport()
+    profile = _write_profile(tmp_path)
+
+    with patch("relay_tools.board_cli._client") as mock_client_factory:
+        client = RelayClient(
+            DEFAULT_URL,
+            client_factory=lambda **kwargs: httpx.Client(
+                transport=transport,
+                **kwargs,
+            ),
+        )
+        mock_client_factory.return_value = client
+        result = runner.invoke(
+            board_cli,
+            ["rom2820", "--config", str(profile), "status"],
+        )
+
+    assert result.exit_code != 0
+    assert (
+        "Specify either board config name or --config path, not both."
+        in result.output
+    )

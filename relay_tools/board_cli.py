@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 import click
 
@@ -17,6 +18,15 @@ from relay_tools.client import DEFAULT_URL, RelayClient, RelayClientError
 logger = logging.getLogger(__name__)
 
 
+class BoardCLIGroup(click.Group):
+    """Group that accepts an optional leading board config name."""
+
+    def parse_args(self, ctx: click.Context, args: list[str]) -> list[str]:
+        if args and not args[0].startswith("-") and args[0] not in self.commands:
+            ctx.meta["board_config_name"] = args.pop(0)
+        return super().parse_args(ctx, args)
+
+
 def _client(url: str) -> RelayClient:
     return RelayClient(url)
 
@@ -25,6 +35,28 @@ def _load_controller(url: str, config_path: str) -> tuple[RelayClient, BoardCont
     relay_client = _client(url)
     profile = load_board_profile(config_path)
     return relay_client, BoardController(profile, relay_client)
+
+
+def _resolve_config_path(config_name: str | None, config_path: str | None) -> str:
+    if config_name and config_path:
+        raise click.UsageError(
+            "Specify either board config name or --config path, not both."
+        )
+    if config_path:
+        return config_path
+    if config_name:
+        if "/" in config_name or "\\" in config_name:
+            raise click.BadParameter(
+                "Board config name must not include path separators.",
+                param_hint="config_name",
+            )
+        file_name = (
+            config_name
+            if config_name.endswith(".yaml")
+            else f"{config_name}.yaml"
+        )
+        return str(Path(DEFAULT_BOARD_CONFIG).parent / file_name)
+    return DEFAULT_BOARD_CONFIG
 
 
 def _emit_result(result: WorkflowResult) -> None:
@@ -65,7 +97,7 @@ def _run_board_action(
         raise click.ClickException(str(exc)) from exc
 
 
-@click.group()
+@click.group(cls=BoardCLIGroup)
 @click.option(
     "--url",
     default=DEFAULT_URL,
@@ -76,10 +108,9 @@ def _run_board_action(
 @click.option(
     "--config",
     "config_path",
-    default=DEFAULT_BOARD_CONFIG,
-    show_default=True,
+    default=None,
     envvar="RELAY_BOARD_CONFIG",
-    help="Path to the board profile YAML file.",
+    help="Path to the board profile YAML file (overrides config_name).",
 )
 @click.option(
     "--verbose",
@@ -89,15 +120,21 @@ def _run_board_action(
     help="Enable verbose (DEBUG) logging.",
 )
 @click.pass_context
-def board_cli(ctx: click.Context, url: str, config_path: str, verbose: bool) -> None:
+def board_cli(
+    ctx: click.Context,
+    url: str,
+    config_path: str | None,
+    verbose: bool,
+) -> None:
     """relay-board – board-level relay workflows over HTTP."""
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.WARNING,
         format="%(levelname)s %(name)s: %(message)s",
     )
     ctx.ensure_object(dict)
+    config_name = ctx.meta.get("board_config_name")
     ctx.obj["url"] = url
-    ctx.obj["config_path"] = config_path
+    ctx.obj["config_path"] = _resolve_config_path(config_name, config_path)
 
 
 def _common_options(fn):
