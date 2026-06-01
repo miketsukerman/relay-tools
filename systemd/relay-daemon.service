@@ -31,7 +31,7 @@
 #       sudo systemctl edit relay-daemon.service
 #
 # Common overrides:
-#   - Change listen port:        ExecStart=/usr/local/bin/relay serve --port 9000
+#   - Change listen port:        ExecStart=/usr/bin/relay serve --port 9000
 #   - Force a specific driver:   Environment=RELAY_DRIVER=rpigpio
 #   - Bind to localhost only:    ExecStart=… --host 127.0.0.1
 #   - Use a different config:    Environment=RELAY_CONFIG=/etc/relay/custom.yaml
