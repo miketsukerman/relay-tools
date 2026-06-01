@@ -99,6 +99,9 @@ by `relay-client`, so it can run from any host that can reach the daemon.
 # Read the configured board signal and switch state
 relay-board --config /etc/relay/boards.d/rom2820.yaml status
 
+# Resolve config by board name from /etc/relay/boards.d/<name>.yaml
+relay-board rom2820 status
+
 # Apply a named boot-mode profile
 relay-board set-boot-mode emmc
 
@@ -114,6 +117,8 @@ relay-board status
 `relay-board` executes configured relay actions and exits; it does not block on a
 board-health condition. Use `--verify` (default from the board profile) to read
 relay state back after each step.
+You can pass an optional `config_name` as the first argument (before the
+subcommand) to load `/etc/relay/boards.d/<config_name>.yaml`.
 
 For full board profile schema details, worked YAML examples, action reference,
 and workflow tutorials, see:

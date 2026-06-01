@@ -11,8 +11,10 @@ and optionally define reusable workflows.
 
 - Default path: `/etc/relay/boards.d/rom2820.yaml`
 - Override with:
+  - `relay-board <config_name> ...` → `/etc/relay/boards.d/<config_name>.yaml`
   - `relay-board --config /path/to/profile.yaml ...`
   - `RELAY_BOARD_CONFIG=/path/to/profile.yaml relay-board ...`
+- `config_name` and `--config` are mutually exclusive.
 
 The file must be a YAML mapping (dictionary) at the top level.
 
