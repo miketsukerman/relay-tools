@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "relay-tools"
-version = "0.1.2"
+version = "0.2"
 description = "Tooling for Waveshare Raspberry Pi relay hats"
 readme = "README.md"
 license = { file = "LICENSE" }
