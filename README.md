@@ -81,6 +81,40 @@ relay all-on
 relay all-off
 ```
 
+## HTTP client usage
+
+```bash
+# Same channel-level commands over the daemon API
+relay-client --url http://pi.local:8000 status
+relay-client on 1
+relay-client press 2 --duration 0.5
+```
+
+## Board control usage
+
+Board control is additive and runs on top of the same relay daemon HTTP API used
+by `relay-client`, so it can run from any host that can reach the daemon.
+
+```bash
+# Read the configured board signal state
+relay-board --config /etc/relay/boards.d/rom2820.yaml status
+
+# Apply a named boot-mode profile
+relay-board set-boot-mode emmc
+
+# Apply a boot mode, execute the boot workflow, then exit
+relay-board boot-and-wait emmc
+
+# Override the daemon URL or board profile path
+RELAY_API_URL=http://pi.local:8000 \
+RELAY_BOARD_CONFIG=/etc/relay/boards.d/rom2820.yaml \
+relay-board status
+```
+
+`relay-board` executes configured relay actions and exits; it does not block on a
+board-health condition. Use `--verify` (default from the board profile) to read
+relay state back after each step.
+
 ---
 
 ## REST API
@@ -225,3 +259,56 @@ class MyRelayBoard(AbstractRelayBoard):
 pip install -e ".[dev]"
 pytest
 ```
+
+## `/etc/relay` configuration layout
+
+Channel startup state config remains unchanged:
+
+- `/etc/relay/channels.yaml`
+
+Board profiles are separate additive files:
+
+- `/etc/relay/boards.d/rom2820.yaml`
+
+Board profiles define:
+
+- relay channel mappings for named board signals,
+- timing parameters,
+- named boot modes,
+- optional composite workflows.
+
+Validation errors are surfaced with actionable CLI messages for missing files,
+unknown signals, invalid timings, missing boot modes, and conflicting channel
+mappings.
+
+## ROM2820 profile notes
+
+The repository now ships a ROM2820 sample profile at
+`/tmp/workspace/miketsukerman/relay-tools/systemd/rom2820-board.yaml` and, in
+Debian packages, under `/usr/share/relay-tools/examples/rom2820-board.yaml`.
+
+The current sample includes the supplied switch mapping:
+
+- SW1003 → channel 1
+- SW1002 → channel 2
+- SW1001-2 → channel 3
+- SW1001-1 → channel 4
+
+Power-key/reset mappings and exact boot-mode switch states were not provided, so
+the sample keeps those fields commented until the operator fills them from the
+board manual revision in use.
+
+## systemd and deployment
+
+The sample `relay-daemon.service` still deploys the daemon exactly as before and
+continues to use `/etc/relay/channels.yaml` for channel startup state.
+
+For board control:
+
+1. Copy `systemd/rom2820-board.yaml` to `/etc/relay/boards.d/rom2820.yaml`.
+2. Set `RELAY_BOARD_CONFIG` in your shell or service environment if you want a
+   non-default board profile path.
+3. Run `relay-board` against the same daemon URL used by `relay-client`.
+
+Existing `relay`, `relay-client`, and REST endpoints remain unchanged; board
+control is opt-in additive functionality.

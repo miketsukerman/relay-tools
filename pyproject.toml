@@ -33,6 +33,7 @@ dev = [
 relay = "relay_tools.cli:cli"
 relay-api = "relay_tools.cli:serve_api"
 relay-client = "relay_tools.client_cli:client_cli"
+relay-board = "relay_tools.board_cli:board_cli"
 
 [tool.setuptools.packages.find]
 where = ["."]

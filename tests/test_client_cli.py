@@ -9,6 +9,7 @@ import httpx
 import pytest
 from click.testing import CliRunner
 
+from relay_tools.client import ChannelState, RelayClient, RelayConnectionError
 from relay_tools.client_cli import _DEFAULT_URL, client_cli
 
 # ---------------------------------------------------------------------------
@@ -73,10 +74,15 @@ def _run(
 ):
     """Invoke client_cli with a mocked httpx transport."""
     with patch("relay_tools.client_cli._client") as mock_client_factory:
-        # Build a real httpx.Client backed by the mock transport
-        client = httpx.Client(base_url=url, transport=transport)
+        client = RelayClient(
+            url,
+            client_factory=lambda **kwargs: httpx.Client(
+                transport=transport,
+                **kwargs,
+            ),
+        )
         mock_client_factory.return_value.__enter__ = lambda s: client
-        mock_client_factory.return_value.__exit__ = lambda s, *a: None
+        mock_client_factory.return_value.__exit__ = lambda s, *a: client.close()
         return runner.invoke(client_cli, list(args))
 
 
@@ -150,16 +156,14 @@ class TestClientCLIChannelCommands:
         with patch("relay_tools.client_cli._client") as mock_factory:
             mock_client = mock_factory.return_value.__enter__.return_value
             mock_factory.return_value.__exit__ = lambda s, *a: None
-            mock_client.post.return_value = httpx.Response(
-                200, request=httpx.Request("POST", "http://localhost/relays/6/press"),
-                json=_channel_state(6, False)
+            mock_client.press.return_value = ChannelState(
+                channel=6,
+                on=False,
             )
             result = runner.invoke(client_cli, ["press", "6", "--duration", "0.5"])
         assert result.exit_code == 0
         assert "Channel 6: PRESSED" in result.output
-        mock_client.post.assert_called_once_with(
-            "/relays/6/press", params={"duration": 0.5}
-        )
+        mock_client.press.assert_called_once_with(6, 0.5)
 
     def test_status_command(self, runner: CliRunner) -> None:
         transport = _make_transport(
@@ -208,10 +212,9 @@ class TestClientCLIErrors:
 
     def test_connection_error_shows_message(self, runner: CliRunner) -> None:
         with patch("relay_tools.client_cli._client") as mock_factory:
-            mock_factory.return_value.__enter__ = lambda s: (_ for _ in ()).throw(
-                httpx.ConnectError("refused")
-            )
+            mock_client = mock_factory.return_value.__enter__.return_value
             mock_factory.return_value.__exit__ = lambda s, *a: None
+            mock_client.on.side_effect = RelayConnectionError(_DEFAULT_URL)
             result = runner.invoke(client_cli, ["on", "1"])
         assert result.exit_code != 0
         assert "daemon" in result.output.lower() or "connect" in result.output.lower()
@@ -237,42 +240,51 @@ class TestClientCLIErrors:
 class TestClientCLIOptions:
     def test_default_url_is_localhost_8000(self, runner: CliRunner) -> None:
         with patch("relay_tools.client_cli._client") as mock_factory:
-            client = httpx.Client(
-                base_url=_DEFAULT_URL,
-                transport=_make_transport(
-                    {("GET", "/relays"): httpx.Response(200, json=_board_state())}
+            client = RelayClient(
+                _DEFAULT_URL,
+                client_factory=lambda **kwargs: httpx.Client(
+                    transport=_make_transport(
+                        {("GET", "/relays"): httpx.Response(200, json=_board_state())}
+                    ),
+                    **kwargs,
                 ),
             )
             mock_factory.return_value.__enter__ = lambda s: client
-            mock_factory.return_value.__exit__ = lambda s, *a: None
+            mock_factory.return_value.__exit__ = lambda s, *a: client.close()
             runner.invoke(client_cli, ["status"])
         mock_factory.assert_called_once_with(_DEFAULT_URL)
 
     def test_custom_url_option(self, runner: CliRunner) -> None:
         custom_url = "http://pi.local:9000"
         with patch("relay_tools.client_cli._client") as mock_factory:
-            client = httpx.Client(
-                base_url=custom_url,
-                transport=_make_transport(
-                    {("GET", "/relays"): httpx.Response(200, json=_board_state())}
+            client = RelayClient(
+                custom_url,
+                client_factory=lambda **kwargs: httpx.Client(
+                    transport=_make_transport(
+                        {("GET", "/relays"): httpx.Response(200, json=_board_state())}
+                    ),
+                    **kwargs,
                 ),
             )
             mock_factory.return_value.__enter__ = lambda s: client
-            mock_factory.return_value.__exit__ = lambda s, *a: None
+            mock_factory.return_value.__exit__ = lambda s, *a: client.close()
             runner.invoke(client_cli, ["--url", custom_url, "status"])
         mock_factory.assert_called_once_with(custom_url)
 
     def test_url_from_env_var(self, runner: CliRunner, monkeypatch) -> None:
         monkeypatch.setenv("RELAY_API_URL", "http://env-host:7777")
         with patch("relay_tools.client_cli._client") as mock_factory:
-            client = httpx.Client(
-                base_url="http://env-host:7777",
-                transport=_make_transport(
-                    {("GET", "/relays"): httpx.Response(200, json=_board_state())}
+            client = RelayClient(
+                "http://env-host:7777",
+                client_factory=lambda **kwargs: httpx.Client(
+                    transport=_make_transport(
+                        {("GET", "/relays"): httpx.Response(200, json=_board_state())}
+                    ),
+                    **kwargs,
                 ),
             )
             mock_factory.return_value.__enter__ = lambda s: client
-            mock_factory.return_value.__exit__ = lambda s, *a: None
+            mock_factory.return_value.__exit__ = lambda s, *a: client.close()
             runner.invoke(client_cli, ["status"])
         mock_factory.assert_called_once_with("http://env-host:7777")
 
