@@ -293,10 +293,11 @@ The current sample includes the supplied switch mapping:
 - SW1002 → channel 2
 - SW1001-2 → channel 3
 - SW1001-1 → channel 4
+- General power input → channel 5
 
-Power-key/reset mappings and exact boot-mode switch states were not provided, so
-the sample keeps those fields commented until the operator fills them from the
-board manual revision in use.
+Reset mapping and exact boot-mode switch states were not provided, so the sample
+keeps those fields commented until the operator fills them from the board manual
+revision in use.
 
 ## systemd and deployment
 

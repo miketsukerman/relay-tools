@@ -12,14 +12,14 @@
 #   SW1001-2 -> relay channel 3
 #   SW1001-1 -> relay channel 4
 #
-# Power-key and reset-key mappings were not provided yet, so they are left
-# commented out below. Add them before using power-on/off/reset workflows.
+# General power input is mapped to relay channel 5.
+# Reset-key mapping was not provided yet, so it remains commented out below.
 
 name: rom2820
 
 defaults:
   verify: true
-  # power_signal: power_key
+  power_signal: general_power_input
   # reset_signal: reset_key
 
 signals:
@@ -35,18 +35,18 @@ signals:
   sw1001_1:
     channel: 4
     description: ROM2820 SW1001 position 1
-  # power_key:
-  #   channel: 5
-  #   description: ROM2820 power key
+  general_power_input:
+    channel: 5
+    description: ROM2820 general power input
   # reset_key:
   #   channel: 6
   #   description: ROM2820 reset key
 
 timings:
-  settle_delay: 0.5
+  settle_delay: 1.0
   boot_wait: 1.0
-  # power_on_pulse: 0.2
-  # power_off_pulse: 6.0
+  power_on_pulse: 0.2
+  power_off_pulse: 6.0
   # reset_pulse: 0.2
 
 boot_modes:
@@ -79,10 +79,10 @@ boot_modes:
 # workflows:
 #   power-cycle:
 #     - action: pulse
-#       signal: power_key
+#       signal: general_power_input
 #       timing: power_off_pulse
 #     - action: delay
 #       timing: settle_delay
 #     - action: pulse
-#       signal: power_key
+#       signal: general_power_input
 #       timing: power_on_pulse
