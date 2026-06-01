@@ -267,10 +267,15 @@ This profile uses pulse-based defaults for power and reset commands.
 - `relay-board reset` → workflow `reset`
 - `relay-board power-cycle` → workflow `power-cycle`
 - `relay-board boot-and-wait <mode>` → workflow `boot-and-wait`
+- `relay-board flash-internal-memory` → workflow `flash-internal-memory`
 
 To customize behavior, define those names in `workflows` and then run the normal
 CLI command. This keeps operations consistent for operators while allowing board-
 specific step sequences.
+
+To run any other workflow name directly, use:
+
+- `relay-board run-workflow <workflow-name>`
 
 ---
 

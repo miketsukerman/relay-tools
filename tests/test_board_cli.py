@@ -77,6 +77,11 @@ boot_modes:
     switches:
       sw1003: on
       sw1002: on
+workflows:
+  flash-internal-memory:
+    - action: set
+      switch: sw1003
+      state: on
 """,
     )
     return path
@@ -171,6 +176,41 @@ def test_boot_and_wait_runs_boot_mode_then_power_sequence(
         ("POST", "/relays/5/on"),
     ]
     assert delays == [0.5, 1.5]
+
+
+def test_run_workflow_executes_named_workflow(tmp_path) -> None:
+    runner = CliRunner()
+    transport = _RecordingTransport()
+    profile = _write_profile(tmp_path)
+
+    result = _run(
+        runner,
+        transport,
+        profile,
+        "run-workflow",
+        "flash-internal-memory",
+        "--no-verify",
+    )
+
+    assert result.exit_code == 0
+    assert transport.calls[:1] == [("POST", "/relays/1/on")]
+
+
+def test_flash_internal_memory_runs_standard_workflow(tmp_path) -> None:
+    runner = CliRunner()
+    transport = _RecordingTransport()
+    profile = _write_profile(tmp_path)
+
+    result = _run(
+        runner,
+        transport,
+        profile,
+        "flash-internal-memory",
+        "--no-verify",
+    )
+
+    assert result.exit_code == 0
+    assert transport.calls[:1] == [("POST", "/relays/1/on")]
 
 
 def test_config_name_resolves_profile_from_default_directory(tmp_path) -> None:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import pytest
 
 from relay_tools.board import BoardController, BoardExecutionError
@@ -11,6 +13,7 @@ from relay_tools.board_config import (
     BootModeConfig,
     SignalConfig,
     SwitchConfig,
+    WorkflowStepConfig,
 )
 from relay_tools.client import BoardState, ChannelState
 
@@ -128,3 +131,26 @@ def test_verify_failure_is_actionable() -> None:
 
     with pytest.raises(BoardExecutionError, match="expected active, got inactive"):
         controller.set_boot_mode("recovery", verify=True, force=True)
+
+
+def test_flash_internal_memory_runs_named_workflow() -> None:
+    relay_client = _FakeRelayClient()
+    profile = replace(
+        _profile(),
+        workflows={
+            "flash-internal-memory": (
+                WorkflowStepConfig(
+                    name="flash-internal-memory:set-sw1003",
+                    action="set",
+                    switch="sw1003",
+                    state=True,
+                ),
+            )
+        },
+    )
+    controller = BoardController(profile, relay_client)
+
+    result = controller.flash_internal_memory(verify=False)
+
+    assert relay_client.calls == [("on", 1)]
+    assert result.final_status.switches["sw1003"] is True

@@ -308,5 +308,52 @@ def cmd_boot_and_wait(
         _emit_result(result)
 
 
+@board_cli.command("run-workflow")
+@click.argument("workflow_name")
+@_common_options
+@click.pass_context
+def cmd_run_workflow(
+    ctx: click.Context,
+    workflow_name: str,
+    verify: bool | None,
+    force: bool,
+) -> None:
+    """Execute a named workflow from the board profile."""
+
+    result = _run_board_action(
+        url=ctx.obj["url"],
+        config_path=ctx.obj["config_path"],
+        callback=lambda controller: controller.run_workflow(
+            workflow_name,
+            verify=_resolve_verify(controller, verify),
+            force=force,
+        ),
+    )
+    if result is not None:
+        _emit_result(result)
+
+
+@board_cli.command("flash-internal-memory")
+@_common_options
+@click.pass_context
+def cmd_flash_internal_memory(
+    ctx: click.Context,
+    verify: bool | None,
+    force: bool,
+) -> None:
+    """Execute the flash-internal-memory workflow."""
+
+    result = _run_board_action(
+        url=ctx.obj["url"],
+        config_path=ctx.obj["config_path"],
+        callback=lambda controller: controller.flash_internal_memory(
+            verify=_resolve_verify(controller, verify),
+            force=force,
+        ),
+    )
+    if result is not None:
+        _emit_result(result)
+
+
 def main() -> None:  # pragma: no cover
     board_cli()
