@@ -10,6 +10,7 @@ from relay_tools.board_config import (
     BoardProfile,
     BootModeConfig,
     SignalConfig,
+    SwitchConfig,
 )
 from relay_tools.client import BoardState, ChannelState
 
@@ -50,28 +51,36 @@ def _profile() -> BoardProfile:
     return BoardProfile(
         name="rom2820",
         signals={
-            "sw1003": SignalConfig("sw1003", 1),
-            "sw1002": SignalConfig("sw1002", 2),
-            "power_key": SignalConfig("power_key", 5),
             "reset_key": SignalConfig("reset_key", 6),
         },
+        switches={
+            "sw1003": SwitchConfig("sw1003", 1),
+            "sw1002": SwitchConfig("sw1002", 2),
+            "general_power_input": SwitchConfig("general_power_input", 5),
+        },
         timings={
-            "power_on_pulse": 0.2,
-            "power_off_pulse": 1.0,
             "reset_pulse": 0.1,
             "settle_delay": 0.5,
             "boot_wait": 1.5,
         },
         boot_modes={
-            "emmc": BootModeConfig("emmc", {"sw1003": False, "sw1002": False}),
+            "emmc": BootModeConfig(
+                "emmc",
+                signals={},
+                switches={"sw1003": False, "sw1002": False},
+            ),
             "recovery": BootModeConfig(
                 "recovery",
-                {"sw1003": True, "sw1002": True},
+                signals={},
+                switches={"sw1003": True, "sw1002": True},
                 risky=True,
             ),
         },
         workflows={},
-        defaults=BoardDefaults(power_signal="power_key", reset_signal="reset_key"),
+        defaults=BoardDefaults(
+            power_switch="general_power_input",
+            reset_signal="reset_key",
+        ),
     )
 
 
@@ -82,7 +91,7 @@ def test_set_boot_mode_updates_expected_channels() -> None:
     result = controller.set_boot_mode("emmc", verify=True)
 
     assert [call[:2] for call in relay_client.calls] == [("off", 1), ("off", 2)]
-    assert result.final_status.signals["sw1003"] is False
+    assert result.final_status.switches["sw1003"] is False
     assert result.final_status.matching_boot_modes == ("emmc",)
 
 
@@ -97,7 +106,7 @@ def test_power_cycle_uses_default_signal_and_delays(monkeypatch) -> None:
 
     controller.power_cycle(verify=False)
 
-    assert relay_client.calls == [("press", 5, 1.0), ("press", 5, 0.2)]
+    assert relay_client.calls == [("off", 5), ("on", 5)]
     assert delays == [0.5]
 
 

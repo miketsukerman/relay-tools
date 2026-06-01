@@ -34,10 +34,16 @@ def _emit_result(result: WorkflowResult) -> None:
     for channel in result.final_status.relay_state.channels:
         label = "ON " if channel.on else "OFF"
         click.echo(f"  Channel {channel.channel:>2}: {label}")
-    click.echo("Board signals:")
-    for signal_name, active in sorted(result.final_status.signals.items()):
-        label = "ACTIVE" if active else "inactive"
-        click.echo(f"  {signal_name}: {label}")
+    if result.final_status.signals:
+        click.echo("Board signals:")
+        for signal_name, active in sorted(result.final_status.signals.items()):
+            label = "ACTIVE" if active else "inactive"
+            click.echo(f"  {signal_name}: {label}")
+    if result.final_status.switches:
+        click.echo("Board switches:")
+        for switch_name, active in sorted(result.final_status.switches.items()):
+            label = "ACTIVE" if active else "inactive"
+            click.echo(f"  {switch_name}: {label}")
     if result.final_status.matching_boot_modes:
         click.echo(
             "Matching boot modes: "
@@ -116,7 +122,7 @@ def _resolve_verify(controller: BoardController, verify: bool | None) -> bool:
 @board_cli.command("status")
 @click.pass_context
 def cmd_status(ctx: click.Context) -> None:
-    """Show current board signal state and matching boot modes."""
+    """Show current board signal/switch state and matching boot modes."""
 
     def _callback(controller: BoardController) -> WorkflowResult:
         board_status = controller.status()

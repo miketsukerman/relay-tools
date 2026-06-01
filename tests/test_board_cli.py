@@ -56,26 +56,25 @@ def _write_profile(tmp_path):
         """
 name: rom2820
 defaults:
-  power_signal: power_key
+  power_switch: general_power_input
 signals:
+switches:
   sw1003: {channel: 1}
   sw1002: {channel: 2}
   sw1001_2: {channel: 3}
   sw1001_1: {channel: 4}
-  power_key: {channel: 5}
+  general_power_input: {channel: 5}
 timings:
-  power_on_pulse: 0.2
-  power_off_pulse: 1.0
   settle_delay: 0.5
   boot_wait: 1.5
 boot_modes:
   emmc:
-    signals:
+    switches:
       sw1003: off
       sw1002: off
   recovery:
     risky: true
-    signals:
+    switches:
       sw1003: on
       sw1002: on
 """,
@@ -159,7 +158,7 @@ def test_boot_and_wait_runs_boot_mode_then_power_sequence(
     assert transport.calls[:4] == [
         ("POST", "/relays/1/off"),
         ("POST", "/relays/2/off"),
-        ("POST", "/relays/5/press"),
-        ("POST", "/relays/5/press"),
+        ("POST", "/relays/5/off"),
+        ("POST", "/relays/5/on"),
     ]
     assert delays == [0.5, 1.5]

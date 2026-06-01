@@ -22,28 +22,27 @@ def test_load_board_profile_parses_valid_config(tmp_path: Path) -> None:
             """
 name: rom2820
 defaults:
-  power_signal: power_key
+  power_switch: general_power_input
   reset_signal: reset_key
 signals:
+  reset_key: {channel: 6}
+switches:
   sw1003: {channel: 1}
   sw1002: {channel: 2}
   sw1001_2: {channel: 3}
   sw1001_1: {channel: 4}
-  power_key: {channel: 5}
-  reset_key: {channel: 6}
+  general_power_input: {channel: 5}
 timings:
-  power_on_pulse: 0.2
-  power_off_pulse: 1.5
   reset_pulse: 0.1
   settle_delay: 0.5
 boot_modes:
   emmc:
-    signals:
+    switches:
       sw1003: off
       sw1002: off
   usb-recovery:
     risky: true
-    signals:
+    switches:
       sw1003: on
       sw1002: on
 workflows:
@@ -58,7 +57,7 @@ workflows:
     )
 
     assert profile.name == "rom2820"
-    assert profile.signals["sw1002"].channel == 2
+    assert profile.switches["sw1002"].channel == 2
     assert profile.boot_modes["usb-recovery"].risky is True
     assert profile.workflows["enter-recovery"][1].timing == "reset_pulse"
 
@@ -70,6 +69,22 @@ def test_load_board_profile_rejects_conflicting_signal_channels(tmp_path: Path) 
 signals:
   one: {channel: 1}
   two: {channel: 1}
+""",
+    )
+    with pytest.raises(BoardConfigError, match="conflicts"):
+        load_board_profile(path)
+
+
+def test_load_board_profile_rejects_signal_switch_channel_conflict(
+    tmp_path: Path,
+) -> None:
+    path = _write_profile(
+        tmp_path,
+        """
+signals:
+  reset_key: {channel: 1}
+switches:
+  general_power_input: {channel: 1}
 """,
     )
     with pytest.raises(BoardConfigError, match="conflicts"):
@@ -89,6 +104,22 @@ boot_modes:
 """,
     )
     with pytest.raises(BoardConfigError, match="unknown signal"):
+        load_board_profile(path)
+
+
+def test_load_board_profile_rejects_unknown_boot_mode_switch(tmp_path: Path) -> None:
+    path = _write_profile(
+        tmp_path,
+        """
+switches:
+  sw1003: {channel: 1}
+boot_modes:
+  emmc:
+    switches:
+      sw1002: on
+""",
+    )
+    with pytest.raises(BoardConfigError, match="unknown switch"):
         load_board_profile(path)
 
 

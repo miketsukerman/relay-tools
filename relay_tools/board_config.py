@@ -31,11 +31,22 @@ class SignalConfig:
 
 
 @dataclass(frozen=True)
+class SwitchConfig:
+    """Relay mapping for a named board switch."""
+
+    name: str
+    channel: int
+    active: bool = True
+    description: str | None = None
+
+
+@dataclass(frozen=True)
 class BootModeConfig:
-    """Named boot-mode signal state set."""
+    """Named boot-mode signal/switch state set."""
 
     name: str
     signals: dict[str, bool]
+    switches: dict[str, bool]
     risky: bool = False
     description: str | None = None
 
@@ -47,6 +58,7 @@ class WorkflowStepConfig:
     name: str
     action: str
     signal: str | None = None
+    switch: str | None = None
     state: bool | None = None
     duration: float | None = None
     timing: str | None = None
@@ -56,9 +68,10 @@ class WorkflowStepConfig:
 
 @dataclass(frozen=True)
 class BoardDefaults:
-    """Default signal names and execution options."""
+    """Default signal/switch names and execution options."""
 
     power_signal: str | None = None
+    power_switch: str | None = None
     reset_signal: str | None = None
     verify: bool = True
 
@@ -69,6 +82,7 @@ class BoardProfile:
 
     name: str
     signals: dict[str, SignalConfig]
+    switches: dict[str, SwitchConfig]
     timings: dict[str, float]
     boot_modes: dict[str, BootModeConfig]
     workflows: dict[str, tuple[WorkflowStepConfig, ...]]
@@ -91,48 +105,83 @@ def _parse_duration(value: Any, context: str) -> float:
     return duration
 
 
-def _parse_signals(raw_signals: Any) -> dict[str, SignalConfig]:
-    signals_data = _require_mapping(raw_signals or {}, "signals")
-    signals: dict[str, SignalConfig] = {}
-    channels_in_use: dict[int, str] = {}
-    for signal_name, raw_signal in signals_data.items():
-        signal_data = _require_mapping(raw_signal, f"signals.{signal_name}")
+def _parse_named_controls(
+    raw_controls: Any,
+    *,
+    context: str,
+    channels_in_use: dict[int, tuple[str, str]],
+) -> dict[str, dict[str, Any]]:
+    controls_data = _require_mapping(raw_controls or {}, context)
+    parsed_controls: dict[str, dict[str, Any]] = {}
+    for control_name, raw_control in controls_data.items():
+        control_data = _require_mapping(raw_control, f"{context}.{control_name}")
         try:
-            channel = int(signal_data["channel"])
+            channel = int(control_data["channel"])
         except KeyError as exc:
             raise BoardConfigError(
-                f"signals.{signal_name} is missing required key 'channel'."
+                f"{context}.{control_name} is missing required key 'channel'."
             ) from exc
         except (TypeError, ValueError) as exc:
             raise BoardConfigError(
-                f"signals.{signal_name}.channel must be an integer."
+                f"{context}.{control_name}.channel must be an integer."
             ) from exc
         if channel in channels_in_use:
-            other_signal = channels_in_use[channel]
+            other_context, other_name = channels_in_use[channel]
             raise BoardConfigError(
-                f"signals.{signal_name}.channel conflicts with signal "
-                f"{other_signal!r} on channel {channel}."
+                f"{context}.{control_name}.channel conflicts with "
+                f"{other_context[:-1]} {other_name!r} on channel {channel}."
             )
-        channels_in_use[channel] = str(signal_name)
+        channels_in_use[channel] = (context, str(control_name))
         try:
-            active = _parse_state(signal_data.get("active", "on"), channel)
+            active = _parse_state(control_data.get("active", "on"), channel)
         except ValueError as exc:
             raise BoardConfigError(
-                f"signals.{signal_name}.active is invalid: {exc}"
+                f"{context}.{control_name}.active is invalid: {exc}"
             ) from exc
-        signals[str(signal_name)] = SignalConfig(
-            name=str(signal_name),
-            channel=channel,
-            active=active,
-            description=signal_data.get("description"),
-        )
-    return signals
+        parsed_controls[str(control_name)] = {
+            "name": str(control_name),
+            "channel": channel,
+            "active": active,
+            "description": control_data.get("description"),
+        }
+    return parsed_controls
+
+
+def _parse_signals(
+    raw_signals: Any,
+    *,
+    channels_in_use: dict[int, tuple[str, str]],
+) -> dict[str, SignalConfig]:
+    return {
+        name: SignalConfig(**data)
+        for name, data in _parse_named_controls(
+            raw_signals,
+            context="signals",
+            channels_in_use=channels_in_use,
+        ).items()
+    }
+
+
+def _parse_switches(
+    raw_switches: Any,
+    *,
+    channels_in_use: dict[int, tuple[str, str]],
+) -> dict[str, SwitchConfig]:
+    return {
+        name: SwitchConfig(**data)
+        for name, data in _parse_named_controls(
+            raw_switches,
+            context="switches",
+            channels_in_use=channels_in_use,
+        ).items()
+    }
 
 
 def _parse_boot_modes(
     raw_boot_modes: Any,
     *,
     signals: dict[str, SignalConfig],
+    switches: dict[str, SwitchConfig],
 ) -> dict[str, BootModeConfig]:
     boot_modes_data = _require_mapping(raw_boot_modes or {}, "boot_modes")
     boot_modes: dict[str, BootModeConfig] = {}
@@ -151,12 +200,26 @@ def _parse_boot_modes(
             signal_states[str(signal_name)] = _parse_state(
                 state_value, signals[str(signal_name)].channel
             )
+        raw_switch_states = _require_mapping(
+            mode_data.get("switches", {}), f"boot_modes.{mode_name}.switches"
+        )
+        switch_states: dict[str, bool] = {}
+        for switch_name, state_value in raw_switch_states.items():
+            if switch_name not in switches:
+                raise BoardConfigError(
+                    f"boot_modes.{mode_name}.switches references unknown switch "
+                    f"{switch_name!r}."
+                )
+            switch_states[str(switch_name)] = _parse_state(
+                state_value, switches[str(switch_name)].channel
+            )
         risky_value = mode_data.get("risky", False)
         if not isinstance(risky_value, bool):
             raise BoardConfigError(f"boot_modes.{mode_name}.risky must be a boolean.")
         boot_modes[str(mode_name)] = BootModeConfig(
             name=str(mode_name),
             signals=signal_states,
+            switches=switch_states,
             risky=risky_value,
             description=mode_data.get("description"),
         )
@@ -167,6 +230,7 @@ def _parse_workflows(
     raw_workflows: Any,
     *,
     signals: dict[str, SignalConfig],
+    switches: dict[str, SwitchConfig],
     timings: dict[str, float],
     boot_modes: dict[str, BootModeConfig],
 ) -> dict[str, tuple[WorkflowStepConfig, ...]]:
@@ -188,23 +252,48 @@ def _parse_workflows(
                 )
             step_name = str(step_data.get("name") or f"{workflow_name}:{index}")
             signal_name = step_data.get("signal")
+            switch_name = step_data.get("switch")
             boot_mode_name = step_data.get("boot_mode")
             timing_name = step_data.get("timing")
             duration = step_data.get("duration")
             state = step_data.get("state")
 
-            if action in {"set", "pulse", "verify"}:
+            if action == "pulse":
                 if signal_name not in signals:
                     raise BoardConfigError(
                         f"workflows.{workflow_name}[{index}] references unknown "
                         f"signal {signal_name!r}."
                     )
+                if switch_name is not None:
+                    raise BoardConfigError(
+                        f"workflows.{workflow_name}[{index}] cannot pulse a switch."
+                    )
             if action in {"set", "verify"}:
+                if (signal_name is None) == (switch_name is None):
+                    raise BoardConfigError(
+                        f"workflows.{workflow_name}[{index}] requires exactly one "
+                        "of 'signal' or 'switch'."
+                    )
+                target_channel: int
+                if signal_name is not None:
+                    if signal_name not in signals:
+                        raise BoardConfigError(
+                            f"workflows.{workflow_name}[{index}] references unknown "
+                            f"signal {signal_name!r}."
+                        )
+                    target_channel = signals[str(signal_name)].channel
+                else:
+                    if switch_name not in switches:
+                        raise BoardConfigError(
+                            f"workflows.{workflow_name}[{index}] references unknown "
+                            f"switch {switch_name!r}."
+                        )
+                    target_channel = switches[str(switch_name)].channel
                 if state is None:
                     raise BoardConfigError(
                         f"workflows.{workflow_name}[{index}] requires 'state'."
                     )
-                state = _parse_state(state, signals[str(signal_name)].channel)
+                state = _parse_state(state, target_channel)
             else:
                 state = None
             if action in {"pulse", "delay"}:
@@ -225,6 +314,9 @@ def _parse_workflows(
             else:
                 duration = None
                 timing_name = None
+            if action in {"delay", "set-boot-mode"}:
+                signal_name = None
+                switch_name = None
             if action == "set-boot-mode":
                 if boot_mode_name not in boot_modes:
                     raise BoardConfigError(
@@ -239,6 +331,7 @@ def _parse_workflows(
                     name=step_name,
                     action=action,
                     signal=str(signal_name) if signal_name is not None else None,
+                    switch=str(switch_name) if switch_name is not None else None,
                     state=state,
                     duration=duration,
                     timing=str(timing_name) if timing_name is not None else None,
@@ -256,23 +349,28 @@ def _parse_defaults(
     raw_defaults: Any,
     *,
     signals: dict[str, SignalConfig],
+    switches: dict[str, SwitchConfig],
 ) -> BoardDefaults:
     defaults_data = _require_mapping(raw_defaults or {}, "defaults")
     power_signal = defaults_data.get("power_signal")
+    power_switch = defaults_data.get("power_switch")
     reset_signal = defaults_data.get("reset_signal")
-    for key, signal_name in {
-        "power_signal": power_signal,
-        "reset_signal": reset_signal,
-    }.items():
-        if signal_name is not None and signal_name not in signals:
+    for key, signal_name, allowed in (
+        ("power_signal", power_signal, signals),
+        ("power_switch", power_switch, switches),
+        ("reset_signal", reset_signal, signals),
+    ):
+        if signal_name is not None and signal_name not in allowed:
+            label = "switch" if key == "power_switch" else "signal"
             raise BoardConfigError(
-                f"defaults.{key} references unknown signal {signal_name!r}."
+                f"defaults.{key} references unknown {label} {signal_name!r}."
             )
     verify = defaults_data.get("verify", True)
     if not isinstance(verify, bool):
         raise BoardConfigError("defaults.verify must be a boolean.")
     return BoardDefaults(
         power_signal=str(power_signal) if power_signal is not None else None,
+        power_switch=str(power_switch) if power_switch is not None else None,
         reset_signal=str(reset_signal) if reset_signal is not None else None,
         verify=verify,
     )
@@ -292,17 +390,31 @@ def load_board_profile(path: str | Path) -> BoardProfile:
         raise BoardConfigError(f"Board config {config_path} must contain a mapping.")
 
     name = str(data.get("name") or config_path.stem)
-    signals = _parse_signals(data.get("signals"))
+    channels_in_use: dict[int, tuple[str, str]] = {}
+    signals = _parse_signals(data.get("signals"), channels_in_use=channels_in_use)
+    switches = _parse_switches(
+        data.get("switches"),
+        channels_in_use=channels_in_use,
+    )
     timings_data = _require_mapping(data.get("timings", {}), "timings")
     timings = {
         str(key): _parse_duration(value, f"timings.{key}")
         for key, value in timings_data.items()
     }
-    defaults = _parse_defaults(data.get("defaults"), signals=signals)
-    boot_modes = _parse_boot_modes(data.get("boot_modes"), signals=signals)
+    defaults = _parse_defaults(
+        data.get("defaults"),
+        signals=signals,
+        switches=switches,
+    )
+    boot_modes = _parse_boot_modes(
+        data.get("boot_modes"),
+        signals=signals,
+        switches=switches,
+    )
     workflows = _parse_workflows(
         data.get("workflows"),
         signals=signals,
+        switches=switches,
         timings=timings,
         boot_modes=boot_modes,
     )
@@ -310,6 +422,7 @@ def load_board_profile(path: str | Path) -> BoardProfile:
     return BoardProfile(
         name=name,
         signals=signals,
+        switches=switches,
         timings=timings,
         boot_modes=boot_modes,
         workflows=workflows,
