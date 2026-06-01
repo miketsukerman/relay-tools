@@ -5,7 +5,12 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 
-from relay_tools.board_config import BoardProfile, SignalConfig, WorkflowStepConfig
+from relay_tools.board_config import (
+    BoardProfile,
+    SignalConfig,
+    SwitchConfig,
+    WorkflowStepConfig,
+)
 from relay_tools.client import BoardState, RelayClient
 
 
@@ -43,10 +48,11 @@ class ExecutedStep:
 
 @dataclass(frozen=True)
 class BoardStatus:
-    """Observed state of the board profile signals."""
+    """Observed state of the board profile signals and switches."""
 
     relay_state: BoardState
     signals: dict[str, bool]
+    switches: dict[str, bool]
     matching_boot_modes: tuple[str, ...]
 
 
@@ -68,8 +74,12 @@ class BoardController:
     def status(self) -> BoardStatus:
         relay_state = self.relay_client.status()
         signal_state = {
-            name: self._signal_active(signal, relay_state.by_channel)
+            name: self._target_active(signal, relay_state.by_channel)
             for name, signal in self.profile.signals.items()
+        }
+        switch_state = {
+            name: self._target_active(switch, relay_state.by_channel)
+            for name, switch in self.profile.switches.items()
         }
         matching_boot_modes = tuple(
             mode_name
@@ -78,10 +88,15 @@ class BoardController:
                 signal_state[signal_name] == expected
                 for signal_name, expected in boot_mode.signals.items()
             )
+            and all(
+                switch_state[switch_name] == expected
+                for switch_name, expected in boot_mode.switches.items()
+            )
         )
         return BoardStatus(
             relay_state=relay_state,
             signals=signal_state,
+            switches=switch_state,
             matching_boot_modes=matching_boot_modes,
         )
 
@@ -121,13 +136,26 @@ class BoardController:
                 recovery_hint="Re-run with --force after confirming the board manual.",
             )
         return tuple(
-            WorkflowStepConfig(
-                name=f"set-boot-mode:{mode_name}:{signal_name}",
-                action="set",
-                signal=signal_name,
-                state=state,
-            )
-            for signal_name, state in mode.signals.items()
+            [
+                *(
+                    WorkflowStepConfig(
+                        name=f"set-boot-mode:{mode_name}:{signal_name}",
+                        action="set",
+                        signal=signal_name,
+                        state=state,
+                    )
+                    for signal_name, state in mode.signals.items()
+                ),
+                *(
+                    WorkflowStepConfig(
+                        name=f"set-boot-mode:{mode_name}:{switch_name}",
+                        action="set",
+                        switch=switch_name,
+                        state=state,
+                    )
+                    for switch_name, state in mode.switches.items()
+                ),
+            ]
         )
 
     def run_workflow(
@@ -155,6 +183,13 @@ class BoardController:
     def power_on(self, *, verify: bool, force: bool = False) -> WorkflowResult:
         if "power-on" in self.profile.workflows:
             return self.run_workflow("power-on", verify=verify, force=force)
+        if self.profile.defaults.power_switch:
+            return self._set_default_switch(
+                "power-on",
+                self.profile.defaults.power_switch,
+                True,
+                verify=verify,
+            )
         return self._pulse_default_signal(
             "power-on",
             self.profile.defaults.power_signal,
@@ -165,6 +200,13 @@ class BoardController:
     def power_off(self, *, verify: bool, force: bool = False) -> WorkflowResult:
         if "power-off" in self.profile.workflows:
             return self.run_workflow("power-off", verify=verify, force=force)
+        if self.profile.defaults.power_switch:
+            return self._set_default_switch(
+                "power-off",
+                self.profile.defaults.power_switch,
+                False,
+                verify=verify,
+            )
         return self._pulse_default_signal(
             "power-off",
             self.profile.defaults.power_signal,
@@ -186,13 +228,22 @@ class BoardController:
         if "power-cycle" in self.profile.workflows:
             return self.run_workflow("power-cycle", verify=verify, force=force)
         steps = []
-        steps.extend(
-            self._default_power_steps(
-                "power-off",
-                self.profile.defaults.power_signal,
-                "power_off_pulse",
+        if self.profile.defaults.power_switch:
+            steps.extend(
+                self._default_switch_steps(
+                    "power-off",
+                    self.profile.defaults.power_switch,
+                    False,
+                )
             )
-        )
+        else:
+            steps.extend(
+                self._default_power_steps(
+                    "power-off",
+                    self.profile.defaults.power_signal,
+                    "power_off_pulse",
+                )
+            )
         settle_delay = self.profile.timings.get("settle_delay")
         if settle_delay is not None:
             steps.append(
@@ -202,13 +253,22 @@ class BoardController:
                     duration=settle_delay,
                 )
             )
-        steps.extend(
-            self._default_power_steps(
-                "power-on",
-                self.profile.defaults.power_signal,
-                "power_on_pulse",
+        if self.profile.defaults.power_switch:
+            steps.extend(
+                self._default_switch_steps(
+                    "power-on",
+                    self.profile.defaults.power_switch,
+                    True,
+                )
             )
-        )
+        else:
+            steps.extend(
+                self._default_power_steps(
+                    "power-on",
+                    self.profile.defaults.power_signal,
+                    "power_on_pulse",
+                )
+            )
         return self._execute_steps(tuple(steps), verify=verify, force=force)
 
     def boot_and_wait(
@@ -230,13 +290,22 @@ class BoardController:
         if "power-cycle" in self.profile.workflows:
             steps.extend(self.profile.workflows["power-cycle"])
         else:
-            steps.extend(
-                self._default_power_steps(
-                    "power-off",
-                    self.profile.defaults.power_signal,
-                    "power_off_pulse",
+            if self.profile.defaults.power_switch:
+                steps.extend(
+                    self._default_switch_steps(
+                        "power-off",
+                        self.profile.defaults.power_switch,
+                        False,
+                    )
                 )
-            )
+            else:
+                steps.extend(
+                    self._default_power_steps(
+                        "power-off",
+                        self.profile.defaults.power_signal,
+                        "power_off_pulse",
+                    )
+                )
             settle_delay = self.profile.timings.get("settle_delay")
             if settle_delay is not None:
                 steps.append(
@@ -246,13 +315,22 @@ class BoardController:
                         duration=settle_delay,
                     )
                 )
-            steps.extend(
-                self._default_power_steps(
-                    "power-on",
-                    self.profile.defaults.power_signal,
-                    "power_on_pulse",
+            if self.profile.defaults.power_switch:
+                steps.extend(
+                    self._default_switch_steps(
+                        "power-on",
+                        self.profile.defaults.power_switch,
+                        True,
+                    )
                 )
-            )
+            else:
+                steps.extend(
+                    self._default_power_steps(
+                        "power-on",
+                        self.profile.defaults.power_signal,
+                        "power_on_pulse",
+                    )
+                )
         boot_wait = self.profile.timings.get("boot_wait")
         if boot_wait is not None:
             steps.append(
@@ -273,6 +351,17 @@ class BoardController:
         verify: bool,
     ) -> WorkflowResult:
         steps = self._default_power_steps(step_name, signal_name, timing_name)
+        return self._execute_steps(tuple(steps), verify=verify, force=False)
+
+    def _set_default_switch(
+        self,
+        step_name: str,
+        switch_name: str | None,
+        state: bool,
+        *,
+        verify: bool,
+    ) -> WorkflowResult:
+        steps = self._default_switch_steps(step_name, switch_name, state)
         return self._execute_steps(tuple(steps), verify=verify, force=False)
 
     def _default_power_steps(
@@ -311,6 +400,30 @@ class BoardController:
             )
         ]
 
+    def _default_switch_steps(
+        self,
+        step_name: str,
+        switch_name: str | None,
+        state: bool,
+    ) -> list[WorkflowStepConfig]:
+        if not switch_name:
+            raise BoardExecutionError(
+                step_name=step_name,
+                message="required switch mapping is missing from the board profile",
+                recovery_hint=(
+                    "Add the switch mapping to the board config or define "
+                    "the workflow explicitly."
+                ),
+            )
+        return [
+            WorkflowStepConfig(
+                name=step_name,
+                action="set",
+                switch=switch_name,
+                state=state,
+            )
+        ]
+
     def _execute_steps(
         self,
         steps: tuple[WorkflowStepConfig, ...],
@@ -341,7 +454,7 @@ class BoardController:
         verify: bool,
     ) -> ExecutedStep:
         if step.action == "set":
-            return self._set_signal(step, verify=verify)
+            return self._set_target(step, verify=verify)
         if step.action == "pulse":
             return self._pulse_signal(step, verify=verify)
         if step.action == "delay":
@@ -349,7 +462,7 @@ class BoardController:
             time.sleep(duration)
             return ExecutedStep(step.name, f"delay {duration:.3f}s")
         if step.action == "verify":
-            return self._verify_signal(step)
+            return self._verify_target(step)
         raise BoardExecutionError(
             step_name=step.name,
             message="unsupported step action",
@@ -362,21 +475,22 @@ class BoardController:
             return self.profile.timings[step.timing]
         raise BoardExecutionError(step_name=step.name, message="duration is missing")
 
-    def _set_signal(self, step: WorkflowStepConfig, *, verify: bool) -> ExecutedStep:
-        signal = self._get_signal(step)
-        relay_on = signal.active if step.state else not signal.active
-        self._set_relay_state(signal.channel, relay_on)
+    def _set_target(self, step: WorkflowStepConfig, *, verify: bool) -> ExecutedStep:
+        target, target_kind = self._get_target(step)
+        relay_on = target.active if step.state else not target.active
+        self._set_relay_state(target.channel, relay_on)
         if verify:
-            self._assert_signal_state(
-                signal,
+            self._assert_target_state(
+                target,
                 expected=bool(step.state),
                 step_name=step.name,
                 recovery_hint=step.recovery_hint,
+                target_kind=target_kind,
             )
         state_label = "active" if step.state else "inactive"
         return ExecutedStep(
             step.name,
-            f"set {signal.name} {state_label} (channel {signal.channel})",
+            f"set {target_kind} {target.name} {state_label} (channel {target.channel})",
         )
 
     def _pulse_signal(self, step: WorkflowStepConfig, *, verify: bool) -> ExecutedStep:
@@ -400,37 +514,44 @@ class BoardController:
             f"pulse {signal.name} for {duration:.3f}s (channel {signal.channel})",
         )
 
-    def _verify_signal(self, step: WorkflowStepConfig) -> ExecutedStep:
-        signal = self._get_signal(step)
-        self._assert_signal_state(
-            signal,
+    def _verify_target(self, step: WorkflowStepConfig) -> ExecutedStep:
+        target, target_kind = self._get_target(step)
+        self._assert_target_state(
+            target,
             expected=bool(step.state),
             step_name=step.name,
             recovery_hint=step.recovery_hint,
+            target_kind=target_kind,
         )
         state_label = "active" if step.state else "inactive"
-        return ExecutedStep(step.name, f"verified {signal.name} is {state_label}")
+        return ExecutedStep(
+            step.name,
+            f"verified {target_kind} {target.name} is {state_label}",
+        )
 
-    def _assert_signal_state(
+    def _assert_target_state(
         self,
-        signal: SignalConfig,
+        target: SignalConfig | SwitchConfig,
         *,
         expected: bool,
         step_name: str,
         recovery_hint: str | None,
+        target_kind: str,
     ) -> None:
-        observed = self.relay_client.get_channel(signal.channel).on
-        actual = observed == signal.active
+        observed = self.relay_client.get_channel(target.channel).on
+        actual = observed == target.active
         if actual != expected:
             raise BoardExecutionError(
                 step_name=step_name,
-                message=f"signal {signal.name!r} did not reach the requested state",
+                message=(
+                    f"{target_kind} {target.name!r} did not reach the requested state"
+                ),
                 expected="active" if expected else "inactive",
                 actual="active" if actual else "inactive",
                 recovery_hint=recovery_hint
                 or (
-                    f"Check relay channel {signal.channel} and wiring "
-                    f"for {signal.name}."
+                    f"Check relay channel {target.channel} and wiring "
+                    f"for {target.name}."
                 ),
             )
 
@@ -442,6 +563,19 @@ class BoardController:
             )
         return self.profile.signals[step.signal]
 
+    def _get_target(
+        self,
+        step: WorkflowStepConfig,
+    ) -> tuple[SignalConfig | SwitchConfig, str]:
+        if step.signal is not None:
+            return self._get_signal(step), "signal"
+        if not step.switch or step.switch not in self.profile.switches:
+            raise BoardExecutionError(
+                step_name=step.name,
+                message=f"unknown switch {step.switch!r}",
+            )
+        return self.profile.switches[step.switch], "switch"
+
     def _set_relay_state(self, channel: int, relay_on: bool) -> None:
         if relay_on:
             self.relay_client.on(channel)
@@ -449,6 +583,9 @@ class BoardController:
             self.relay_client.off(channel)
 
     @staticmethod
-    def _signal_active(signal: SignalConfig, channel_state: dict[int, bool]) -> bool:
-        relay_on = channel_state.get(signal.channel, False)
-        return relay_on == signal.active
+    def _target_active(
+        target: SignalConfig | SwitchConfig,
+        channel_state: dict[int, bool],
+    ) -> bool:
+        relay_on = channel_state.get(target.channel, False)
+        return relay_on == target.active

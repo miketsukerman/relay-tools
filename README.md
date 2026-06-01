@@ -96,7 +96,7 @@ Board control is additive and runs on top of the same relay daemon HTTP API used
 by `relay-client`, so it can run from any host that can reach the daemon.
 
 ```bash
-# Read the configured board signal state
+# Read the configured board signal and switch state
 relay-board --config /etc/relay/boards.d/rom2820.yaml status
 
 # Apply a named boot-mode profile
@@ -272,14 +272,14 @@ Board profiles are separate additive files:
 
 Board profiles define:
 
-- relay channel mappings for named board signals,
+- relay channel mappings for named board signals and maintained switches,
 - timing parameters,
 - named boot modes,
 - optional composite workflows.
 
 Validation errors are surfaced with actionable CLI messages for missing files,
-unknown signals, invalid timings, missing boot modes, and conflicting channel
-mappings.
+unknown signals or switches, invalid timings, missing boot modes, and
+conflicting channel mappings.
 
 ## ROM2820 profile notes
 
@@ -287,7 +287,7 @@ The repository now ships a ROM2820 sample profile at
 `/tmp/workspace/miketsukerman/relay-tools/systemd/rom2820-board.yaml` and, in
 Debian packages, under `/usr/share/relay-tools/examples/rom2820-board.yaml`.
 
-The current sample includes the supplied switch mapping:
+The current sample models the supplied ROM2820 controls as maintained switches:
 
 - SW1003 → channel 1
 - SW1002 → channel 2
@@ -295,9 +295,10 @@ The current sample includes the supplied switch mapping:
 - SW1001-1 → channel 4
 - General power input → channel 5
 
-Reset mapping and exact boot-mode switch states were not provided, so the sample
-keeps those fields commented until the operator fills them from the board manual
-revision in use.
+The sample also treats general power input as a maintained switch: ON provides
+power and OFF removes it. Reset mapping and exact boot-mode switch states were
+not provided, so the sample keeps those fields commented until the operator
+fills them from the board manual revision in use.
 
 ## systemd and deployment
 
