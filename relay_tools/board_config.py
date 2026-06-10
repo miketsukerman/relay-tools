@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 import yaml
 
 from relay_tools.config import _parse_state
 
-DEFAULT_BOARD_CONFIG = "/etc/relay/boards.d/rom2820.yaml"
+DEFAULT_BOARD_CONFIG_DIR = Path("/etc/relay/boards.d")
+LEGACY_DEFAULT_BOARD_CONFIG = str(DEFAULT_BOARD_CONFIG_DIR / "rom2820.yaml")
+DEFAULT_BOARD_CONFIG = LEGACY_DEFAULT_BOARD_CONFIG
+DEFAULT_BOARD_CONFIG_ENV = "RELAY_BOARD_CONFIG"
+DEFAULT_BOARD_SELECTOR_ENV = "RELAY_BOARD_DEFAULT"
 SUPPORTED_WORKFLOW_ACTIONS = frozenset(
     {"set", "pulse", "delay", "verify", "set-boot-mode"}
 )
@@ -18,6 +23,48 @@ SUPPORTED_WORKFLOW_ACTIONS = frozenset(
 
 class BoardConfigError(ValueError):
     """Raised when a board profile is invalid."""
+
+
+def resolve_board_config_name(
+    config_name: str,
+    *,
+    config_dir: str | Path = DEFAULT_BOARD_CONFIG_DIR,
+) -> str:
+    """Resolve a board config name to an absolute YAML path."""
+
+    if "/" in config_name or "\\" in config_name:
+        raise ValueError("Board config name must not include path separators.")
+    if not config_name:
+        raise ValueError("Board config name must not be empty.")
+    file_name = config_name if config_name.endswith(".yaml") else f"{config_name}.yaml"
+    return str(Path(config_dir) / file_name)
+
+
+def resolve_default_board_config_path(
+    *,
+    env: Mapping[str, str] | None = None,
+    config_dir: str | Path = DEFAULT_BOARD_CONFIG_DIR,
+    fallback_path: str | Path = LEGACY_DEFAULT_BOARD_CONFIG,
+) -> str:
+    """Resolve default board config path from env variables and fallback."""
+
+    env_map = os.environ if env is None else env
+    configured_path = (env_map.get(DEFAULT_BOARD_CONFIG_ENV) or "").strip()
+    if configured_path:
+        return configured_path
+
+    configured_default = (env_map.get(DEFAULT_BOARD_SELECTOR_ENV) or "").strip()
+    if configured_default:
+        is_path = (
+            Path(configured_default).is_absolute()
+            or "/" in configured_default
+            or "\\" in configured_default
+        )
+        if is_path:
+            return configured_default
+        return resolve_board_config_name(configured_default, config_dir=config_dir)
+
+    return str(fallback_path)
 
 
 @dataclass(frozen=True)
