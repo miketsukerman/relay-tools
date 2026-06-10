@@ -221,12 +221,12 @@ This profile uses pulse-based defaults for power and reset commands.
 1. Copy a profile:
    ```bash
    sudo install -D -m 0644 \
-     /usr/share/relay-tools/examples/rom2820-board.yaml \
-     /etc/relay/boards.d/rom2820.yaml
+     /usr/share/relay-tools/examples/lab-board.yaml \
+     /etc/relay/boards.d/lab.yaml
    ```
 2. Verify daemon reachability and profile parse:
    ```bash
-   relay-board --url http://localhost:8000 --config /etc/relay/boards.d/rom2820.yaml status
+   relay-board --url http://localhost:8000 --config /etc/relay/boards.d/lab.yaml status
    ```
 3. Confirm signals/switches render and no config error is shown.
 

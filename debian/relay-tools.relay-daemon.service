@@ -9,7 +9,7 @@
 #       sudo mkdir -p /etc/relay
 #       sudo cp channels.yaml /etc/relay/channels.yaml
 #       sudo mkdir -p /etc/relay/boards.d
-#       sudo cp rom2820-board.yaml /etc/relay/boards.d/rom2820.yaml
+#       sudo cp lab-board.yaml /etc/relay/boards.d/lab.yaml
 #
 # 3. Reload the systemd manager:
 #       sudo systemctl daemon-reload

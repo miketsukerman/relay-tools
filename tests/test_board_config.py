@@ -27,7 +27,7 @@ def test_load_board_profile_parses_valid_config(tmp_path: Path) -> None:
         _write_profile(
             tmp_path,
             """
-name: rom2820
+name: lab
 defaults:
   power_switch: general_power_input
   reset_signal: reset_key
@@ -63,7 +63,7 @@ workflows:
         )
     )
 
-    assert profile.name == "rom2820"
+    assert profile.name == "lab"
     assert profile.switches["sw1002"].channel == 2
     assert profile.boot_modes["usb-recovery"].risky is True
     assert profile.workflows["enter-recovery"][1].timing == "reset_pulse"

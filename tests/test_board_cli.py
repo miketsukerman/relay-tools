@@ -54,7 +54,7 @@ def _write_profile(tmp_path, name: str = "board.yaml"):
     path = tmp_path / name
     path.write_text(
         """
-name: rom2820
+name: lab
 defaults:
   power_switch: general_power_input
 signals:
@@ -253,7 +253,7 @@ def test_config_name_and_config_option_are_mutually_exclusive(tmp_path) -> None:
         mock_client_factory.return_value = client
         result = runner.invoke(
             board_cli,
-            ["rom2820", "--config", str(profile), "status"],
+            ["lab", "--config", str(profile), "status"],
         )
 
     assert result.exit_code != 0

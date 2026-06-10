@@ -52,7 +52,7 @@ class _FakeRelayClient:
 
 def _profile() -> BoardProfile:
     return BoardProfile(
-        name="rom2820",
+        name="lab",
         signals={
             "reset_key": SignalConfig("reset_key", 6),
         },
