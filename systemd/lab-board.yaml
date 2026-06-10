@@ -83,5 +83,5 @@ boot_modes:
 #       timing: settle_delay
 #   power-force-off:
 #     - action: set
-#       switch: general_power_input
+#       switch: aux_power
 #       state: off
