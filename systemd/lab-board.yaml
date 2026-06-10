@@ -1,0 +1,87 @@
+# /etc/relay/boards.d/lab.yaml
+#
+# Sample board profile for relay-board workflows.
+#
+# This sample preserves the existing /etc/relay/channels.yaml flow and adds a
+# separate board profile file for higher-level commands such as relay-board
+# status, set-boot-mode, and boot-and-wait.
+#
+# Example switch mapping:
+#   boot_mode_a -> relay channel 1
+#   boot_mode_b -> relay channel 2
+#   feature_flag -> relay channel 3
+#   aux_power -> relay channel 4
+#
+# The example boot controls and power switch are modeled as maintained switches.
+# Reset-key mapping is optional and remains commented out below.
+
+name: lab
+
+defaults:
+  verify: true
+  power_switch: aux_power
+  # reset_signal: reset_key
+
+signals:
+  # reset_key:
+  #   channel: 6
+  #   description: Optional reset key
+
+switches:
+  boot_mode_a:
+    channel: 1
+    description: Boot mode selector A
+  boot_mode_b:
+    channel: 2
+    description: Boot mode selector B
+  feature_flag:
+    channel: 3
+    description: Feature flag switch
+  aux_power:
+    channel: 4
+    description: Auxiliary power input
+
+timings:
+  settle_delay: 1.0
+  boot_wait: 1.0
+  # reset_pulse: 0.2
+
+boot_modes:
+  manual:
+    description: Safe placeholder that does not force any switch changes.
+    switches: {}
+  # Fill the exact states below for your hardware before use.
+  # emmc:
+  #   switches:
+  #     aux_power: on
+  #     feature_flag: off
+  #     boot_mode_b: off
+  #     boot_mode_a: off
+  # sd:
+  #   switches:
+  #     aux_power: on
+  #     feature_flag: on
+  #     boot_mode_b: off
+  #     boot_mode_a: off
+  # usb-recovery:
+  #   risky: true
+  #   switches:
+  #     aux_power: on
+  #     feature_flag: on
+  #     boot_mode_b: on
+  #     boot_mode_a: on
+
+# Optional named workflows can be added here once reset mapping and any
+# additional timing values are known.
+# workflows:
+#   flash-internal-memory:
+#     - name: flash:set-emmc-mode
+#       action: set-boot-mode
+#       boot_mode: emmc
+#     - name: flash:power-cycle
+#       action: delay
+#       timing: settle_delay
+#   power-force-off:
+#     - action: set
+#       switch: general_power_input
+#       state: off

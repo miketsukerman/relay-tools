@@ -97,10 +97,10 @@ by `relay-client`, so it can run from any host that can reach the daemon.
 
 ```bash
 # Read the configured board signal and switch state
-relay-board --config /etc/relay/boards.d/rom2820.yaml status
+relay-board --config /etc/relay/boards.d/lab.yaml status
 
 # Resolve config by board name from /etc/relay/boards.d/<name>.yaml
-relay-board rom2820 status
+relay-board lab status
 
 # Apply a named boot-mode profile
 relay-board set-boot-mode emmc
@@ -116,7 +116,7 @@ relay-board flash-internal-memory
 
 # Override the daemon URL or board profile path
 RELAY_API_URL=http://pi.local:8000 \
-RELAY_BOARD_CONFIG=/etc/relay/boards.d/rom2820.yaml \
+RELAY_BOARD_CONFIG=/etc/relay/boards.d/lab.yaml \
 relay-board status
 
 # Set package-level default board profile (name or path)
@@ -133,7 +133,7 @@ Selection precedence is:
 `--config` > `config_name` > `RELAY_BOARD_CONFIG` > `RELAY_BOARD_DEFAULT`.
 
 If none of those are set, `relay-board` exits with an error instead of falling
-back to `rom2820`.
+back to an implicit sample profile.
 
 For full board profile schema details, worked YAML examples, action reference,
 and workflow tutorials, see:
@@ -306,24 +306,18 @@ Validation errors are surfaced with actionable CLI messages for missing files,
 unknown signals or switches, invalid timings, missing boot modes, and
 conflicting channel mappings.
 
-## ROM2820 profile notes
+## Sample board profile notes
 
-The repository now ships a ROM2820 sample profile at
-`systemd/rom2820-board.yaml` and, in
-Debian packages, under `/usr/share/relay-tools/examples/rom2820-board.yaml`.
+The repository now ships a generic sample profile at
+`systemd/lab-board.yaml` and, in Debian packages, under
+`/usr/share/relay-tools/examples/lab-board.yaml`.
 
-The current sample models the supplied ROM2820 controls as maintained switches:
+The sample demonstrates:
 
-- SW1003 → channel 1
-- SW1002 → channel 2
-- SW1001-2 → channel 3
-- SW1001-1 → channel 4
-- General power input → channel 5
-
-The sample also treats general power input as a maintained switch: ON provides
-power and OFF removes it. Reset mapping and exact boot-mode switch states were
-not provided, so the sample keeps those fields commented until the operator
-fills them from the board manual revision in use.
+- named maintained switches,
+- an optional default power switch,
+- optional reset wiring,
+- placeholder boot modes that operators can fill in for their hardware.
 
 ## systemd and deployment
 
@@ -332,7 +326,7 @@ continues to use `/etc/relay/channels.yaml` for channel startup state.
 
 For board control:
 
-1. Copy `systemd/rom2820-board.yaml` to `/etc/relay/boards.d/rom2820.yaml`.
+1. Copy `systemd/lab-board.yaml` to `/etc/relay/boards.d/lab.yaml`.
 2. Configure default board profile selection if desired:
    - `RELAY_BOARD_CONFIG=/path/to/profile.yaml` for an explicit path.
    - `RELAY_BOARD_DEFAULT=<name-or-path>` for package-level board default.
