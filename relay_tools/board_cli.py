@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
 import click
 
 from relay_tools.board import BoardController, BoardExecutionError, WorkflowResult
 from relay_tools.board_config import (
-    DEFAULT_BOARD_CONFIG,
+    DEFAULT_BOARD_CONFIG_DIR,
     BoardConfigError,
     load_board_profile,
+    resolve_board_config_name,
+    resolve_default_board_config_path,
 )
 from relay_tools.client import DEFAULT_URL, RelayClient, RelayClientError
 
@@ -45,18 +46,14 @@ def _resolve_config_path(config_name: str | None, config_path: str | None) -> st
     if config_path:
         return config_path
     if config_name:
-        if "/" in config_name or "\\" in config_name:
-            raise click.BadParameter(
-                "Board config name must not include path separators.",
-                param_hint="config_name",
+        try:
+            return resolve_board_config_name(
+                config_name,
+                config_dir=DEFAULT_BOARD_CONFIG_DIR,
             )
-        file_name = (
-            config_name
-            if config_name.endswith(".yaml")
-            else f"{config_name}.yaml"
-        )
-        return str(Path(DEFAULT_BOARD_CONFIG).parent / file_name)
-    return DEFAULT_BOARD_CONFIG
+        except ValueError as exc:
+            raise click.BadParameter(str(exc), param_hint="config_name") from exc
+    return resolve_default_board_config_path(config_dir=DEFAULT_BOARD_CONFIG_DIR)
 
 
 def _emit_result(result: WorkflowResult) -> None:
@@ -109,8 +106,10 @@ def _run_board_action(
     "--config",
     "config_path",
     default=None,
-    envvar="RELAY_BOARD_CONFIG",
-    help="Path to the board profile YAML file (overrides config_name).",
+    help=(
+        "Path to the board profile YAML file. Precedence: --config > config_name > "
+        "RELAY_BOARD_CONFIG > RELAY_BOARD_DEFAULT > package default."
+    ),
 )
 @click.option(
     "--verbose",

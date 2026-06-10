@@ -118,6 +118,10 @@ relay-board flash-internal-memory
 RELAY_API_URL=http://pi.local:8000 \
 RELAY_BOARD_CONFIG=/etc/relay/boards.d/rom2820.yaml \
 relay-board status
+
+# Set package-level default board profile (name or path)
+RELAY_BOARD_DEFAULT=lab \
+relay-board status
 ```
 
 `relay-board` executes configured relay actions and exits; it does not block on a
@@ -125,6 +129,9 @@ board-health condition. Use `--verify` (default from the board profile) to read
 relay state back after each step.
 You can pass an optional `config_name` as the first argument (before the
 subcommand) to load `/etc/relay/boards.d/<config_name>.yaml`.
+Selection precedence is:
+`--config` > `config_name` > `RELAY_BOARD_CONFIG` > `RELAY_BOARD_DEFAULT` >
+package fallback (`/etc/relay/boards.d/rom2820.yaml`).
 
 For full board profile schema details, worked YAML examples, action reference,
 and workflow tutorials, see:
@@ -284,7 +291,7 @@ Channel startup state config remains unchanged:
 
 Board profiles are separate additive files:
 
-- `/etc/relay/boards.d/rom2820.yaml`
+- `/etc/relay/boards.d/<board-name>.yaml`
 
 Board profiles define:
 
@@ -324,8 +331,9 @@ continues to use `/etc/relay/channels.yaml` for channel startup state.
 For board control:
 
 1. Copy `systemd/rom2820-board.yaml` to `/etc/relay/boards.d/rom2820.yaml`.
-2. Set `RELAY_BOARD_CONFIG` in your shell or service environment if you want a
-   non-default board profile path.
+2. Configure default board profile selection if desired:
+   - `RELAY_BOARD_CONFIG=/path/to/profile.yaml` for an explicit path.
+   - `RELAY_BOARD_DEFAULT=<name-or-path>` for package-level board default.
 3. Run `relay-board` against the same daemon URL used by `relay-client`.
 
 Existing `relay`, `relay-client`, and REST endpoints remain unchanged; board

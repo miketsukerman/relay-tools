@@ -37,7 +37,8 @@
 #   - Force a specific driver:   Environment=RELAY_DRIVER=rpigpio
 #   - Bind to localhost only:    ExecStart=… --host 127.0.0.1
 #   - Use a different config:    Environment=RELAY_CONFIG=/etc/relay/custom.yaml
-#   - Board CLI profile path:    export RELAY_BOARD_CONFIG=/etc/relay/boards.d/rom2820.yaml
+#   - Board CLI profile path:    export RELAY_BOARD_CONFIG=/etc/relay/boards.d/lab.yaml
+#   - Board CLI default board:   export RELAY_BOARD_DEFAULT=lab
 #
 # Requirements
 # ------------
@@ -80,8 +81,9 @@ Environment=RELAY_DRIVER=auto
 # OFF if the file is absent; channels not listed also default to OFF.
 Environment=RELAY_CONFIG=/etc/relay/channels.yaml
 
-# Optional default profile path for relay-board operators:
-# Environment=RELAY_BOARD_CONFIG=/etc/relay/boards.d/rom2820.yaml
+# Optional default profile selection for relay-board operators:
+# Environment=RELAY_BOARD_CONFIG=/etc/relay/boards.d/lab.yaml
+# Environment=RELAY_BOARD_DEFAULT=lab
 
 # Restart the daemon automatically if it crashes.
 Restart=on-failure

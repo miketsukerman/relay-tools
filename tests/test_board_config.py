@@ -6,7 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from relay_tools.board_config import BoardConfigError, load_board_profile
+from relay_tools.board_config import (
+    BoardConfigError,
+    DEFAULT_BOARD_CONFIG_ENV,
+    DEFAULT_BOARD_SELECTOR_ENV,
+    load_board_profile,
+    resolve_board_config_name,
+    resolve_default_board_config_path,
+)
 
 
 def _write_profile(tmp_path: Path, content: str) -> Path:
@@ -138,3 +145,41 @@ workflows:
     )
     with pytest.raises(BoardConfigError, match="unknown timing"):
         load_board_profile(path)
+
+
+def test_resolve_board_config_name_from_default_directory() -> None:
+    assert (
+        resolve_board_config_name("lab")
+        == "/etc/relay/boards.d/lab.yaml"
+    )
+
+
+def test_resolve_board_config_name_rejects_separators() -> None:
+    with pytest.raises(ValueError, match="must not include path separators"):
+        resolve_board_config_name("etc/lab")
+
+
+def test_resolve_default_board_config_prefers_relay_board_config() -> None:
+    path = resolve_default_board_config_path(
+        env={
+            DEFAULT_BOARD_CONFIG_ENV: "/tmp/explicit.yaml",
+            DEFAULT_BOARD_SELECTOR_ENV: "lab",
+        }
+    )
+    assert path == "/tmp/explicit.yaml"
+
+
+def test_resolve_default_board_config_uses_named_selector() -> None:
+    path = resolve_default_board_config_path(
+        env={DEFAULT_BOARD_SELECTOR_ENV: "lab"},
+        config_dir="/tmp/boards.d",
+    )
+    assert path == "/tmp/boards.d/lab.yaml"
+
+
+def test_resolve_default_board_config_uses_selector_path_value() -> None:
+    path = resolve_default_board_config_path(
+        env={DEFAULT_BOARD_SELECTOR_ENV: "/tmp/custom-board.yaml"},
+        config_dir="/tmp/boards.d",
+    )
+    assert path == "/tmp/custom-board.yaml"

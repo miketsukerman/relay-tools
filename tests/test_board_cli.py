@@ -93,6 +93,7 @@ def _run(
     profile_path,
     *args: str,
     include_config_option: bool = True,
+    env: dict[str, str] | None = None,
 ):
     with patch("relay_tools.board_cli._client") as mock_client_factory:
         client = RelayClient(
@@ -109,6 +110,7 @@ def _run(
         return runner.invoke(
             board_cli,
             cli_args,
+            env=env,
         )
 
 
@@ -219,8 +221,8 @@ def test_config_name_resolves_profile_from_default_directory(tmp_path) -> None:
     profile = _write_profile(tmp_path, "lab.yaml")
 
     with patch(
-        "relay_tools.board_cli.DEFAULT_BOARD_CONFIG",
-        str(tmp_path / "default.yaml"),
+        "relay_tools.board_cli.DEFAULT_BOARD_CONFIG_DIR",
+        tmp_path,
     ):
         result = _run(
             runner,
@@ -259,3 +261,101 @@ def test_config_name_and_config_option_are_mutually_exclusive(tmp_path) -> None:
         "Specify either board config name or --config path, not both."
         in result.output
     )
+
+
+def test_relay_board_default_env_name_resolves_from_default_directory(tmp_path) -> None:
+    runner = CliRunner()
+    transport = _RecordingTransport()
+    _write_profile(tmp_path, "lab.yaml")
+
+    with patch(
+        "relay_tools.board_cli.DEFAULT_BOARD_CONFIG_DIR",
+        tmp_path,
+    ):
+        result = _run(
+            runner,
+            transport,
+            tmp_path / "ignored.yaml",
+            "status",
+            include_config_option=False,
+            env={"RELAY_BOARD_DEFAULT": "lab"},
+        )
+
+    assert result.exit_code == 0
+    assert "Matching boot modes: emmc" in result.output
+
+
+def test_relay_board_default_env_accepts_absolute_path(tmp_path) -> None:
+    runner = CliRunner()
+    transport = _RecordingTransport()
+    profile = _write_profile(tmp_path, "custom.yaml")
+
+    result = _run(
+        runner,
+        transport,
+        tmp_path / "ignored.yaml",
+        "status",
+        include_config_option=False,
+        env={"RELAY_BOARD_DEFAULT": str(profile)},
+    )
+
+    assert result.exit_code == 0
+    assert "Matching boot modes: emmc" in result.output
+
+
+def test_config_name_wins_over_environment_default(tmp_path) -> None:
+    runner = CliRunner()
+    transport = _RecordingTransport()
+    profile = _write_profile(tmp_path, "lab.yaml")
+
+    with patch(
+        "relay_tools.board_cli.DEFAULT_BOARD_CONFIG_DIR",
+        tmp_path,
+    ):
+        result = _run(
+            runner,
+            transport,
+            profile,
+            "lab",
+            "status",
+            include_config_option=False,
+            env={"RELAY_BOARD_CONFIG": "/does/not/exist.yaml"},
+        )
+
+    assert result.exit_code == 0
+    assert "Matching boot modes: emmc" in result.output
+
+
+def test_config_option_wins_over_environment_default(tmp_path) -> None:
+    runner = CliRunner()
+    transport = _RecordingTransport()
+    profile = _write_profile(tmp_path)
+
+    result = _run(
+        runner,
+        transport,
+        profile,
+        "status",
+        env={"RELAY_BOARD_CONFIG": "/does/not/exist.yaml"},
+    )
+
+    assert result.exit_code == 0
+    assert "Matching boot modes: emmc" in result.output
+
+
+def test_relay_board_config_env_used_when_no_cli_selection(tmp_path) -> None:
+    runner = CliRunner()
+    transport = _RecordingTransport()
+    profile = _write_profile(tmp_path, "from-env.yaml")
+
+    result = _run(
+        runner,
+        transport,
+        tmp_path / "ignored.yaml",
+        "status",
+        include_config_option=False,
+        env={"RELAY_BOARD_CONFIG": str(profile)},
+    )
+
+    assert result.exit_code == 0
+    assert "Matching boot modes: emmc" in result.output
