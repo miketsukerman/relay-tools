@@ -130,8 +130,10 @@ relay state back after each step.
 You can pass an optional `config_name` as the first argument (before the
 subcommand) to load `/etc/relay/boards.d/<config_name>.yaml`.
 Selection precedence is:
-`--config` > `config_name` > `RELAY_BOARD_CONFIG` > `RELAY_BOARD_DEFAULT` >
-package fallback (`/etc/relay/boards.d/rom2820.yaml`).
+`--config` > `config_name` > `RELAY_BOARD_CONFIG` > `RELAY_BOARD_DEFAULT`.
+
+If none of those are set, `relay-board` exits with an error instead of falling
+back to `rom2820`.
 
 For full board profile schema details, worked YAML examples, action reference,
 and workflow tutorials, see:

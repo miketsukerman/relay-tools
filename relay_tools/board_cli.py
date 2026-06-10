@@ -53,7 +53,10 @@ def _resolve_config_path(config_name: str | None, config_path: str | None) -> st
             )
         except ValueError as exc:
             raise click.BadParameter(str(exc), param_hint="config_name") from exc
-    return resolve_default_board_config_path(config_dir=DEFAULT_BOARD_CONFIG_DIR)
+    try:
+        return resolve_default_board_config_path(config_dir=DEFAULT_BOARD_CONFIG_DIR)
+    except ValueError as exc:
+        raise click.UsageError(str(exc)) from exc
 
 
 def _emit_result(result: WorkflowResult) -> None:
@@ -108,7 +111,7 @@ def _run_board_action(
     default=None,
     help=(
         "Path to the board profile YAML file. Precedence: --config > config_name > "
-        "RELAY_BOARD_CONFIG > RELAY_BOARD_DEFAULT > package default."
+        "RELAY_BOARD_CONFIG > RELAY_BOARD_DEFAULT."
     ),
 )
 @click.option(

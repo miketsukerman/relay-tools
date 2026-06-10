@@ -183,3 +183,8 @@ def test_resolve_default_board_config_uses_selector_path_value() -> None:
         config_dir="/tmp/boards.d",
     )
     assert path == "/tmp/custom-board.yaml"
+
+
+def test_resolve_default_board_config_errors_without_configuration() -> None:
+    with pytest.raises(ValueError, match="Could not resolve a board config"):
+        resolve_default_board_config_path(env={})
