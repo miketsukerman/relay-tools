@@ -359,3 +359,12 @@ def test_relay_board_config_env_used_when_no_cli_selection(tmp_path) -> None:
 
     assert result.exit_code == 0
     assert "Matching boot modes: emmc" in result.output
+
+
+def test_missing_board_config_selection_emits_error() -> None:
+    runner = CliRunner()
+
+    result = runner.invoke(board_cli, ["status"], env={})
+
+    assert result.exit_code != 0
+    assert "Could not resolve a board config" in result.output

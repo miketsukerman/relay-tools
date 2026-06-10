@@ -9,7 +9,6 @@ and optionally define reusable workflows.
 
 ## File location and loading
 
-- Package fallback path (compatibility default): `/etc/relay/boards.d/rom2820.yaml`
 - Override with:
   - `relay-board --config /path/to/profile.yaml ...` (highest priority)
   - `relay-board <config_name> ...` → `/etc/relay/boards.d/<config_name>.yaml`
@@ -17,7 +16,8 @@ and optionally define reusable workflows.
   - `RELAY_BOARD_DEFAULT=<name-or-path> relay-board ...`
 - `config_name` and `--config` are mutually exclusive.
 - Selection precedence: `--config` > `config_name` > `RELAY_BOARD_CONFIG` >
-  `RELAY_BOARD_DEFAULT` > package fallback.
+  `RELAY_BOARD_DEFAULT`.
+- If nothing resolves a board profile, `relay-board` exits with an error.
 
 The file must be a YAML mapping (dictionary) at the top level.
 

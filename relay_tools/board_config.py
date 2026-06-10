@@ -12,8 +12,6 @@ import yaml
 from relay_tools.config import _parse_state
 
 DEFAULT_BOARD_CONFIG_DIR = Path("/etc/relay/boards.d")
-LEGACY_DEFAULT_BOARD_CONFIG = str(DEFAULT_BOARD_CONFIG_DIR / "rom2820.yaml")
-DEFAULT_BOARD_CONFIG = LEGACY_DEFAULT_BOARD_CONFIG
 DEFAULT_BOARD_CONFIG_ENV = "RELAY_BOARD_CONFIG"
 DEFAULT_BOARD_SELECTOR_ENV = "RELAY_BOARD_DEFAULT"
 SUPPORTED_WORKFLOW_ACTIONS = frozenset(
@@ -44,9 +42,8 @@ def resolve_default_board_config_path(
     *,
     env: Mapping[str, str] | None = None,
     config_dir: str | Path = DEFAULT_BOARD_CONFIG_DIR,
-    fallback_path: str | Path = LEGACY_DEFAULT_BOARD_CONFIG,
 ) -> str:
-    """Resolve default board config path from env variables and fallback."""
+    """Resolve default board config path from env variables."""
 
     env_map = os.environ if env is None else env
     configured_path = (env_map.get(DEFAULT_BOARD_CONFIG_ENV) or "").strip()
@@ -64,7 +61,10 @@ def resolve_default_board_config_path(
             return configured_default
         return resolve_board_config_name(configured_default, config_dir=config_dir)
 
-    return str(fallback_path)
+    raise ValueError(
+        "Could not resolve a board config. Specify --config, a board config name, "
+        "or set RELAY_BOARD_CONFIG/RELAY_BOARD_DEFAULT."
+    )
 
 
 @dataclass(frozen=True)
