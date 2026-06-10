@@ -7,9 +7,9 @@ from pathlib import Path
 import pytest
 
 from relay_tools.board_config import (
-    BoardConfigError,
     DEFAULT_BOARD_CONFIG_ENV,
     DEFAULT_BOARD_SELECTOR_ENV,
+    BoardConfigError,
     load_board_profile,
     resolve_board_config_name,
     resolve_default_board_config_path,
