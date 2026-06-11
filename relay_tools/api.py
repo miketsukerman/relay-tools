@@ -42,7 +42,6 @@ from pydantic import BaseModel
 
 from .base import AbstractRelayBoard
 from .config import load_channel_config
-from .waveshare import WaveshareRelayBoard, WaveshareRelayBoardRPiGPIO
 
 # ---------------------------------------------------------------------------
 # Board factory
@@ -54,9 +53,10 @@ def _create_board(
 ) -> AbstractRelayBoard:
     """Instantiate the appropriate relay board backend.
 
-    Mirrors the auto-detection logic in :func:`relay_tools.cli._get_board`
-    but raises :class:`RuntimeError` (instead of a Click exception) so that
-    the error surfaces cleanly during FastAPI lifespan startup.
+    GPIO libraries are imported lazily here so that merely importing this
+    module (e.g. for type checking or during module discovery) does not
+    trigger GPIO initialisation.  Only the running daemon invokes this
+    function.
 
     Args:
         driver: ``"auto"`` tries rpigpio first and falls back to gpiozero.
@@ -67,6 +67,8 @@ def _create_board(
     Raises:
         RuntimeError: When the requested GPIO library is not installed.
     """
+    from .waveshare import WaveshareRelayBoard, WaveshareRelayBoardRPiGPIO
+
     if driver == "auto":
         try:
             return WaveshareRelayBoardRPiGPIO(initial_state=initial_state)
