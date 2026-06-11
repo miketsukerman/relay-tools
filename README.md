@@ -14,7 +14,8 @@ Includes support for the [Waveshare RPi Relay Board (B)](https://www.waveshare.c
   implemented for any relay hardware.
 - **Waveshare RPi Relay Board (B) driver** – GPIO control via `gpiozero`
   (compatible with Raspberry Pi 4 and Raspberry Pi 5).
-- **CLI** – control individual channels or all channels from the terminal.
+- **CLI** – control individual channels or all channels from the terminal via
+  the HTTP daemon (`relay serve`); GPIO access is isolated to the daemon process.
 - **REST API** – an HTTP API built with FastAPI.
 
 ---
@@ -58,7 +59,14 @@ pip install "relay-tools[gpio]"
 
 ## CLI usage
 
+`relay` communicates with a running relay daemon over HTTP.  Start the daemon
+with `relay serve` (or `relay-api`) first, then run channel commands from any
+host that can reach it.
+
 ```bash
+# Start the relay HTTP API daemon (GPIO access only happens here)
+relay serve [--host HOST] [--port PORT] [--driver DRIVER]
+
 # Turn channel 1 ON
 relay on 1
 
@@ -79,6 +87,9 @@ relay all-on
 
 # Turn all channels OFF
 relay all-off
+
+# Connect to a daemon on a different host / port
+relay --url http://pi.local:9000 on 1
 ```
 
 ## HTTP client usage
@@ -203,7 +214,7 @@ curl -X POST http://localhost:8000/relays/off
 ### Basic usage
 
 ```python
-from relay_tools import WaveshareRelayBoard
+from relay_tools.waveshare import WaveshareRelayBoard
 
 # Use as a context manager – board is closed automatically on exit
 with WaveshareRelayBoard() as board:
@@ -216,7 +227,7 @@ with WaveshareRelayBoard() as board:
 ### Controlling individual channels
 
 ```python
-from relay_tools import WaveshareRelayBoard
+from relay_tools.waveshare import WaveshareRelayBoard
 
 with WaveshareRelayBoard() as board:
     board.turn_on(3)           # activate channel 3
@@ -232,7 +243,7 @@ with WaveshareRelayBoard() as board:
 ### Bulk operations
 
 ```python
-from relay_tools import WaveshareRelayBoard
+from relay_tools.waveshare import WaveshareRelayBoard
 
 with WaveshareRelayBoard() as board:
     board.turn_on_all()        # activate every channel
@@ -243,7 +254,7 @@ with WaveshareRelayBoard() as board:
 ### Error handling
 
 ```python
-from relay_tools import WaveshareRelayBoard
+from relay_tools.waveshare import WaveshareRelayBoard
 
 with WaveshareRelayBoard() as board:
     try:
