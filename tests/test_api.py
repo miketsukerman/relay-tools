@@ -156,7 +156,7 @@ class TestCreateBoard:
         from relay_tools.api import _create_board
         mock_board = MagicMock()
         with patch(
-            "relay_tools.api.WaveshareRelayBoardRPiGPIO", return_value=mock_board
+            "relay_tools.waveshare.WaveshareRelayBoardRPiGPIO", return_value=mock_board
         ) as mock_cls:
             board = _create_board("auto")
         assert board is mock_board
@@ -166,7 +166,7 @@ class TestCreateBoard:
         from relay_tools.api import _create_board
         mock_board = MagicMock()
         with patch(
-            "relay_tools.api.WaveshareRelayBoardRPiGPIO", return_value=mock_board
+            "relay_tools.waveshare.WaveshareRelayBoardRPiGPIO", return_value=mock_board
         ) as mock_cls:
             board = _create_board("auto", initial_state=True)
         assert board is mock_board
@@ -177,11 +177,11 @@ class TestCreateBoard:
         mock_board = MagicMock()
         with (
             patch(
-                "relay_tools.api.WaveshareRelayBoardRPiGPIO",
+                "relay_tools.waveshare.WaveshareRelayBoardRPiGPIO",
                 side_effect=ImportError("no RPi.GPIO"),
             ),
             patch(
-                "relay_tools.api.WaveshareRelayBoard", return_value=mock_board
+                "relay_tools.waveshare.WaveshareRelayBoard", return_value=mock_board
             ) as mock_cls,
         ):
             board = _create_board("auto")
@@ -192,11 +192,11 @@ class TestCreateBoard:
         from relay_tools.api import _create_board
         with (
             patch(
-                "relay_tools.api.WaveshareRelayBoardRPiGPIO",
+                "relay_tools.waveshare.WaveshareRelayBoardRPiGPIO",
                 side_effect=ImportError("no RPi.GPIO"),
             ),
             patch(
-                "relay_tools.api.WaveshareRelayBoard",
+                "relay_tools.waveshare.WaveshareRelayBoard",
                 side_effect=ImportError("no gpiozero"),
             ),
         ):
@@ -206,7 +206,7 @@ class TestCreateBoard:
     def test_rpigpio_raises_when_missing(self) -> None:
         from relay_tools.api import _create_board
         with patch(
-            "relay_tools.api.WaveshareRelayBoardRPiGPIO",
+            "relay_tools.waveshare.WaveshareRelayBoardRPiGPIO",
             side_effect=ImportError("no RPi.GPIO"),
         ):
             with pytest.raises(RuntimeError, match="RPi.GPIO"):
@@ -215,7 +215,7 @@ class TestCreateBoard:
     def test_gpiozero_raises_when_missing(self) -> None:
         from relay_tools.api import _create_board
         with patch(
-            "relay_tools.api.WaveshareRelayBoard",
+            "relay_tools.waveshare.WaveshareRelayBoard",
             side_effect=ImportError("no gpiozero"),
         ):
             with pytest.raises(RuntimeError, match="gpiozero"):

@@ -1,14 +1,16 @@
 """Tests for package-level exports in relay_tools.__init__."""
 
-from relay_tools import (
-    AbstractRelayBoard,
-    WaveshareRelayBoard,
-    WaveshareRelayBoardRPiGPIO,
-)
+from relay_tools import AbstractRelayBoard
 
 
-def test_package_exports_are_available() -> None:
-    """Package exports should resolve lazily without changing import API."""
+def test_abstract_relay_board_is_exported() -> None:
+    """AbstractRelayBoard is the only public export from the package root."""
     assert AbstractRelayBoard.__name__ == "AbstractRelayBoard"
-    assert WaveshareRelayBoard.__name__ == "WaveshareRelayBoard"
-    assert WaveshareRelayBoardRPiGPIO.__name__ == "WaveshareRelayBoardRPiGPIO"
+
+
+def test_gpio_classes_not_in_package_namespace() -> None:
+    """GPIO board classes are not exported at the package level."""
+    import relay_tools
+
+    assert not hasattr(relay_tools, "WaveshareRelayBoard")
+    assert not hasattr(relay_tools, "WaveshareRelayBoardRPiGPIO")
