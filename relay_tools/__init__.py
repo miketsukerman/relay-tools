@@ -1,6 +1,23 @@
 """relay_tools – Waveshare RPi Relay Hat tooling."""
 
-from .base import AbstractRelayBoard
-from .waveshare import WaveshareRelayBoard, WaveshareRelayBoardRPiGPIO
+from __future__ import annotations
 
-__all__ = ["AbstractRelayBoard", "WaveshareRelayBoard", "WaveshareRelayBoardRPiGPIO"]
+from .base import AbstractRelayBoard
+
+__all__ = [
+    "AbstractRelayBoard",
+    "WaveshareRelayBoard",
+    "WaveshareRelayBoardRPiGPIO",
+]
+
+
+def __getattr__(name: str) -> object:
+    """Lazily expose optional GPIO-backed board implementations."""
+    if name in {"WaveshareRelayBoard", "WaveshareRelayBoardRPiGPIO"}:
+        from .waveshare import WaveshareRelayBoard, WaveshareRelayBoardRPiGPIO
+
+        return {
+            "WaveshareRelayBoard": WaveshareRelayBoard,
+            "WaveshareRelayBoardRPiGPIO": WaveshareRelayBoardRPiGPIO,
+        }[name]
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
