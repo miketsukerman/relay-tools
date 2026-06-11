@@ -1,6 +1,10 @@
 """Tests for package-level exports in relay_tools.__init__."""
 
-from relay_tools import AbstractRelayBoard, WaveshareRelayBoard, WaveshareRelayBoardRPiGPIO
+from relay_tools import (
+    AbstractRelayBoard,
+    WaveshareRelayBoard,
+    WaveshareRelayBoardRPiGPIO,
+)
 
 
 def test_package_exports_are_available() -> None:
