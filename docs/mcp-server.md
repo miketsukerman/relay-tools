@@ -88,6 +88,44 @@ from `RELAY_BOARD_DEFAULT` / `RELAY_BOARD_CONFIG`).
 Prompts (shown as slash commands in most clients): `smoke_test`,
 `power_cycle_and_check(board)`, `boot_from(board, mode)`.
 
+## Sample prompts
+
+### Built-in MCP prompts
+
+The server ships three prompts. Clients such as Claude Desktop or VS Code show
+them as slash commands; selecting one inserts a ready-made instruction for the
+model.
+
+| Prompt | Arguments | What the agent does |
+|---|---|---|
+| `/smoke_test` | – | Calls `list_boards`, then `describe_board` and `board_status` for each board. Read-only: no relay state is changed. Reports what it could see. |
+| `/power_cycle_and_check` | `board` | Calls `board_status`, `power_cycle`, then `board_status` again and confirms the power switch ended active. |
+| `/boot_from` | `board`, `mode` | Calls `describe_board` to check the mode exists and is not risky, then `set_boot_mode`, `power_cycle` and `board_status`, confirming `mode` is in `matching_boot_modes`. |
+
+### Example free-form prompts
+
+You can also just ask in plain language. Some prompts that map cleanly onto
+the tools:
+
+- *"Which boards can you control, and what boot modes does each one have?"*
+  → `list_boards`, `describe_board`
+- *"Is the lab board powered on right now? Which boot mode is it strapped
+  for?"* → `board_status`
+- *"Power-cycle the lab board and tell me when it's back up."*
+  → `power_cycle`, then `board_status`
+- *"Set the lab board to boot from eMMC and reboot it."*
+  → `set_boot_mode(mode="emmc")`, `power_cycle`
+- *"Boot the board from SD and wait until it has had time to start."*
+  → `boot_and_wait(mode="sd")`
+- *"Run the power-cycle workflow defined in the board profile."*
+  → `run_workflow(workflow="power-cycle")`
+- *"Show me the last ten relay actions that were performed."*
+  → `audit_log(limit=10)`
+
+Prompts that ask for raw channel control ("turn relay 3 on"), `force`, or a
+risky boot mode ("put the board in usb-recovery") are refused by design — see
+the safety rules below.
+
 ## Safety rules
 
 1. **Board-level actions only.** No raw channel tools (`on`, `off`, `toggle`,
