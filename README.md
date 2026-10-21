@@ -17,6 +17,9 @@ Includes support for the [Waveshare RPi Relay Board (B)](https://www.waveshare.c
 - **CLI** – control individual channels or all channels from the terminal via
   the HTTP daemon (`relay serve`); GPIO access is isolated to the daemon process.
 - **REST API** – an HTTP API built with FastAPI.
+- **MCP server** – `relay-mcp` exposes safe, board-level power and boot-mode
+  control to AI agents over the Model Context Protocol
+  (see [`docs/mcp-server.md`](docs/mcp-server.md)).
 
 ---
 
