@@ -1,0 +1,40 @@
+# relay-mcp.service — systemd unit for the relay-tools MCP server
+#
+# Install:
+#   sudo cp relay-mcp.service /etc/systemd/system/relay-mcp.service
+#   sudo cp relay-mcp.env.example /etc/default/relay-mcp
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now relay-mcp
+#
+# Runtime settings are read from /etc/default/relay-mcp (see
+# relay-mcp.env.example). Extra command-line flags can be passed via
+# RELAY_MCP_OPTS in that file.
+
+[Unit]
+Description=Relay MCP Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/relay-tools
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/etc/default/relay-mcp
+# relay-mcp speaks stdio by default; a long-running service needs the HTTP
+# transport. Host/port and other flags can be overridden via RELAY_MCP_OPTS.
+ExecStart=/usr/bin/python3 -m relay_tools.mcp.server --transport http $RELAY_MCP_OPTS
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=false
+
+[Install]
+WantedBy=multi-user.target

@@ -348,3 +348,58 @@ For board control:
 
 Existing `relay`, `relay-client`, and REST endpoints remain unchanged; board
 control is opt-in additive functionality.
+
+## Run as a systemd service
+
+`deploy/systemd/` ships a unit file that runs `relay-mcp` as a managed service
+on a Raspberry Pi and starts it automatically on boot. The unit runs
+`python3 -m relay_tools.mcp.server --transport http` as user `pi` with
+`WorkingDirectory=/home/pi/relay-tools`, restarts on failure, and logs to the
+journal. Runtime settings are overridden via `/etc/default/relay-mcp` — no
+edits to the unit file are needed.
+
+Install and enable:
+
+```bash
+sudo cp deploy/systemd/relay-mcp.service /etc/systemd/system/relay-mcp.service
+sudo cp deploy/systemd/relay-mcp.env.example /etc/default/relay-mcp
+sudo systemctl daemon-reload
+sudo systemctl enable --now relay-mcp
+```
+
+Check status and logs:
+
+```bash
+systemctl status relay-mcp
+journalctl -u relay-mcp -f
+```
+
+Restart or stop:
+
+```bash
+sudo systemctl restart relay-mcp
+sudo systemctl stop relay-mcp
+```
+
+Edit `/etc/default/relay-mcp` to set the daemon URL (`RELAY_API_URL`), API
+token, cooldown, read-only mode, audit log path, and extra command-line flags
+(`RELAY_MCP_OPTS`, e.g. `--host`/`--port`/`--config-dir`). Restart the service
+after changing it.
+
+### Troubleshooting
+
+- **Wrong Python or module path** — the unit uses `/usr/bin/python3` and
+  imports `relay_tools.mcp.server`, so `relay-tools` (with the `mcp` extra)
+  must be installed for that interpreter: `pip install 'relay-tools[mcp]'`.
+  If it is installed in a virtualenv, override `ExecStart` with
+  `sudo systemctl edit relay-mcp` to point at the venv's `python3`.
+  `WorkingDirectory=/home/pi/relay-tools` assumes a checkout at that path;
+  adjust it (or install the package) if your layout differs.
+- **GPIO/device permissions** — `relay-mcp` never touches GPIO itself; it
+  talks to the relay daemon over HTTP. If power actions fail, check that
+  `relay-daemon` is running and that *its* user has GPIO access (member of
+  the `gpio` group, or running as root).
+- **Logs** — stdout/stderr go to the systemd journal. Use
+  `journalctl -u relay-mcp -e` for recent entries and
+  `journalctl -u relay-mcp -f` to follow startup errors such as import
+  failures or an unreachable daemon URL.
