@@ -3,6 +3,7 @@ name: Build Debian Package
 on:
   release:
     types: [published]
+  workflow_dispatch:
 
 jobs:
   build-deb:
@@ -30,6 +31,7 @@ jobs:
             python3-uvicorn
 
       - name: Update changelog version
+        if: github.event_name == 'release'
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           DATE=$(date -R)
@@ -45,7 +47,24 @@ jobs:
           mkdir -p dist
           mv ../*.deb dist/
 
+      - name: Verify package contents
+        run: |
+          dpkg-deb -c dist/*.deb | tee /tmp/deb-contents.txt
+          for path in \
+            ./usr/lib/systemd/system/relay-mcp.service \
+            ./usr/share/relay-tools/examples/relay-mcp.env.example \
+            ./usr/lib/systemd/system/relay-daemon.service \
+            ./usr/share/relay-tools/examples/channels.yaml \
+            ./usr/share/relay-tools/examples/lab-board.yaml \
+          ; do
+            if ! grep -qF " ${path}" /tmp/deb-contents.txt; then
+              echo "::error::missing ${path} in .deb package"
+              exit 1
+            fi
+          done
+
       - name: Upload .deb to release
+        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
           files: dist/*.deb

@@ -12,3 +12,6 @@ override_dh_install:
 
 override_dh_installsystemd:
 	dh_installsystemd --name=relay-daemon
+	# relay-mcp defaults to User=pi; ship the unit but let the admin
+	# review /etc/default/relay-mcp before enabling it.
+	dh_installsystemd --name=relay-mcp --no-enable --no-start

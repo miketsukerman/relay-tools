@@ -1,2 +1,4 @@
 systemd/channels.yaml usr/share/relay-tools/examples/
 systemd/lab-board.yaml usr/share/relay-tools/examples/
+deploy/systemd/relay-mcp.service usr/lib/systemd/system/
+deploy/systemd/relay-mcp.env.example usr/share/relay-tools/examples/
