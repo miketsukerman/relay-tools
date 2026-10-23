@@ -20,7 +20,7 @@ override_dh_virtualenv:
 
 override_dh_install:
 	dh_install
-	install -D -m 0644 systemd/channels.yaml \
+	install -D -m 0644 deploy/systemd/channels.yaml \
 		debian/relay-tools/etc/relay/channels.yaml.example
 
 override_dh_installsystemd:

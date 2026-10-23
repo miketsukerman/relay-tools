@@ -337,7 +337,7 @@ conflicting channel mappings.
 ## Sample board profile notes
 
 The repository now ships a generic sample profile at
-`systemd/lab-board.yaml` and, in Debian packages, under
+`deploy/systemd/lab-board.yaml` and, in Debian packages, under
 `/usr/share/relay-tools/examples/lab-board.yaml`.
 
 The sample demonstrates:
@@ -354,7 +354,7 @@ continues to use `/etc/relay/channels.yaml` for channel startup state.
 
 For board control:
 
-1. Copy `systemd/lab-board.yaml` to `/etc/relay/boards.d/lab.yaml`.
+1. Copy `deploy/systemd/lab-board.yaml` to `/etc/relay/boards.d/lab.yaml`.
 2. Configure default board profile selection if desired:
    - `RELAY_BOARD_CONFIG=/path/to/profile.yaml` for an explicit path.
    - `RELAY_BOARD_DEFAULT=<name-or-path>` for package-level board default.
