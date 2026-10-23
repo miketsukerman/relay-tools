@@ -43,6 +43,20 @@ The Waveshare RPi Relay Board (B) uses the following BCM GPIO pins
 
 ## Installation
 
+**Debian package (recommended on Raspberry Pi)**
+
+The `.deb` built by the release workflow (dh-virtualenv) bundles all Python
+dependencies — including the MCP SDK — in a self-contained virtualenv under
+`/opt/venvs/relay-tools` and exposes `relay`, `relay-api`, `relay-client`,
+`relay-board`, and `relay-mcp` in `/usr/bin`. It only needs the distro's
+`python3` (build and target distribution must match, e.g. Debian/Raspberry Pi
+OS bookworm) and uses the distro GPIO packages (`python3-gpiozero`,
+`python3-lgpio`, `python3-rpi.gpio`) via the venv's system-site-packages.
+
+```bash
+sudo apt install ./relay-tools_<version>_arm64.deb
+```
+
 **Basic install (no GPIO)**
 
 ```bash
@@ -353,10 +367,10 @@ control is opt-in additive functionality.
 
 `deploy/systemd/` ships a unit file that runs `relay-mcp` as a managed service
 on a Raspberry Pi and starts it automatically on boot. The unit runs
-`python3 -m relay_tools.mcp.server --transport http` as user `pi` with
-`WorkingDirectory=/home/pi/relay-tools`, restarts on failure, and logs to the
-journal. Runtime settings are overridden via `/etc/default/relay-mcp` — no
-edits to the unit file are needed.
+`/usr/bin/relay-mcp --transport http` as user `pi` (a symlink into the
+bundled virtualenv when installed from the Debian package), restarts on
+failure, and logs to the journal. Runtime settings are overridden via
+`/etc/default/relay-mcp` — no edits to the unit file are needed.
 
 Install and enable:
 
@@ -388,13 +402,12 @@ after changing it.
 
 ### Troubleshooting
 
-- **Wrong Python or module path** — the unit uses `/usr/bin/python3` and
-  imports `relay_tools.mcp.server`, so `relay-tools` (with the `mcp` extra)
-  must be installed for that interpreter: `pip install 'relay-tools[mcp]'`.
-  If it is installed in a virtualenv, override `ExecStart` with
-  `sudo systemctl edit relay-mcp` to point at the venv's `python3`.
-  `WorkingDirectory=/home/pi/relay-tools` assumes a checkout at that path;
-  adjust it (or install the package) if your layout differs.
+- **Wrong Python or module path** — the unit runs `/usr/bin/relay-mcp`. When
+  installed from the Debian package this is a symlink into the bundled
+  virtualenv at `/opt/venvs/relay-tools`, which already contains the MCP SDK.
+  For a pip install, make sure the entry point is on the path:
+  `pip install 'relay-tools[mcp]'`, or override `ExecStart` with
+  `sudo systemctl edit relay-mcp` to point at your venv's `relay-mcp`.
 - **GPIO/device permissions** — `relay-mcp` never touches GPIO itself; it
   talks to the relay daemon over HTTP. If power actions fail, check that
   `relay-daemon` is running and that *its* user has GPIO access (member of

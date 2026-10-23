@@ -1,3 +1,13 @@
+relay-tools (0.5.0-1) unstable; urgency=medium
+
+  * Switch packaging to dh-virtualenv: bundle all Python dependencies,
+    including the MCP SDK (mcp extra), in /opt/venvs/relay-tools.
+  * Expose CLI entry points via /usr/bin symlinks; point systemd units
+    at them.
+  * Package is now architecture-specific (bundled compiled wheels).
+
+ -- Mikhail Tsukerman <mikhail.tsukerman@advantech.com>  Thu, 23 Oct 2026 18:45:00 +0000
+
 relay-tools (0.1.2) unstable; urgency=medium
 
   * Initial Debian package.

@@ -19,12 +19,12 @@ Wants=network-online.target
 Type=simple
 User=pi
 Group=pi
-WorkingDirectory=/home/pi/relay-tools
 Environment=PYTHONUNBUFFERED=1
 EnvironmentFile=-/etc/default/relay-mcp
 # relay-mcp speaks stdio by default; a long-running service needs the HTTP
 # transport. Host/port and other flags can be overridden via RELAY_MCP_OPTS.
-ExecStart=/usr/bin/python3 -m relay_tools.mcp.server --transport http $RELAY_MCP_OPTS
+# /usr/bin/relay-mcp is a symlink into the bundled /opt/venvs/relay-tools venv.
+ExecStart=/usr/bin/relay-mcp --transport http $RELAY_MCP_OPTS
 Restart=on-failure
 RestartSec=5
 StandardOutput=journal

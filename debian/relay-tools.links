@@ -1,0 +1,5 @@
+opt/venvs/relay-tools/bin/relay usr/bin/relay
+opt/venvs/relay-tools/bin/relay-api usr/bin/relay-api
+opt/venvs/relay-tools/bin/relay-client usr/bin/relay-client
+opt/venvs/relay-tools/bin/relay-board usr/bin/relay-board
+opt/venvs/relay-tools/bin/relay-mcp usr/bin/relay-mcp

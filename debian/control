@@ -4,25 +4,22 @@ Priority: optional
 Maintainer: Mikhail Tsukerman <mikhail.tsukerman@advantech.com>
 Build-Depends:
  debhelper-compat (= 13),
- dh-python,
- python3-all,
- pybuild-plugin-pyproject,
- python3-build,
- python3-installer,
+ dh-virtualenv (>= 1.2),
+ python3-dev,
+ python3-venv,
 Standards-Version: 4.6.2
 Homepage: https://github.com/Advantech-EECC/relay-tools
 Rules-Requires-Root: no
 
 Package: relay-tools
-Architecture: all
+Architecture: any
 Depends:
- ${python3:Depends},
  ${misc:Depends},
- python3-click,
- python3-yaml,
- python3-fastapi,
- python3-httpx,
- python3-uvicorn,
+ python3,
+Recommends:
+ python3-gpiozero,
+ python3-lgpio,
+ python3-rpi.gpio,
 Description: Tooling for Waveshare Raspberry Pi relay hats
  relay-tools provides CLI utilities and an HTTP API for controlling
  Waveshare Raspberry Pi relay hats.
@@ -30,4 +27,10 @@ Description: Tooling for Waveshare Raspberry Pi relay hats
  It supports the Waveshare RPi Relay Board (B) and provides:
   - Direct relay control commands (on, off, toggle, status)
   - A FastAPI-based HTTP API daemon
-  - A systemd service unit for automatic startup
+  - An MCP (Model Context Protocol) server for AI agents
+  - systemd service units for automatic startup
+ .
+ All Python dependencies (including the MCP SDK) are bundled in a
+ self-contained virtualenv under /opt/venvs/relay-tools; only the
+ system Python interpreter of the matching distribution release is
+ required at runtime.

@@ -1,9 +1,22 @@
 #!/usr/bin/make -f
-export PYBUILD_NAME = relay-tools
-export DEB_BUILD_OPTIONS += nocheck
+export DH_VIRTUALENV_INSTALL_ROOT = /opt/venvs
 
 %:
-	dh $@ --with python3 --buildsystem=pybuild
+	dh $@ --with python-virtualenv
+
+override_dh_virtualenv:
+	# Bundle the full dependency closure (including the MCP SDK via the
+	# "mcp" extra) in a self-contained virtualenv. --use-system-packages
+	# lets the venv see distro GPIO packages (python3-gpiozero, lgpio,
+	# RPi.GPIO) on the target without bundling compiled GPIO bindings.
+	dh_virtualenv \
+		--python /usr/bin/python3 \
+		--builtin-venv \
+		--upgrade-pip \
+		--preinstall "setuptools>=42" \
+		--preinstall "wheel" \
+		--use-system-packages \
+		--extras mcp
 
 override_dh_install:
 	dh_install
@@ -15,3 +28,9 @@ override_dh_installsystemd:
 	# relay-mcp defaults to User=pi; ship the unit but let the admin
 	# review /etc/default/relay-mcp before enabling it.
 	dh_installsystemd --name=relay-mcp --no-enable --no-start
+
+# The virtualenv ships prebuilt manylinux wheels (e.g. pydantic-core);
+# skip Debian stripping and shared-library dependency scanning for them.
+override_dh_strip:
+
+override_dh_shlibdeps:

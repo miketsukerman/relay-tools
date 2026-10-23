@@ -42,8 +42,9 @@
 #
 # Requirements
 # ------------
-# relay-tools must be installed (with GPIO extras) before enabling this unit:
-#   pip install relay-tools[gpio]
+# relay-tools is installed with its Python dependencies bundled in
+# /opt/venvs/relay-tools by the Debian package. GPIO bindings come from
+# the distro packages (python3-gpiozero, python3-lgpio, python3-rpi.gpio).
 #
 # On Raspberry Pi the process user must be in the 'gpio' group, or you can
 # run as root (SupplementaryGroups= / User= below).
@@ -68,10 +69,8 @@ User=root
 ExecStartPre=-/bin/mkdir -p /etc/relay
 ExecStartPre=-/bin/mkdir -p /etc/relay/boards.d
 
-# Path to the relay CLI entry point installed by pip.
-# Adjust if you installed into a virtualenv, e.g.:
-#   /opt/relay-tools/bin/relay serve --host 0.0.0.0 --port 8000
-ExecStart=/usr/local/bin/relay serve --host 0.0.0.0 --port 8000
+# Path to the relay CLI entry point (symlink into /opt/venvs/relay-tools).
+ExecStart=/usr/bin/relay serve --host 0.0.0.0 --port 8000
 
 # GPIO driver: "auto" (default) tries RPi.GPIO first, then gpiozero.
 # Override with "rpigpio" or "gpiozero" if auto-detection is unreliable.
