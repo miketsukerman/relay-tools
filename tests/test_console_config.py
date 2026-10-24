@@ -221,6 +221,13 @@ def test_command_length_limit(tmp_path):
         "setenv bootargs quiet",
         "mmc write 0 0 0",
         "cat script | sh",
+        "systemctl restart weston",
+        "kill 1",
+        "echo 1 | tee /proc/sys/kernel/sysrq",
+        "sed -i s/a/b/ /etc/fstab",
+        "mv /etc/a /etc/b",
+        "chmod 777 /etc",
+        "ip link set eth0 down",
     ],
 )
 def test_mutation_lint_refuses(tmp_path, command):
@@ -259,3 +266,36 @@ def test_password_file_not_read_at_parse_time(tmp_path):
     assert profile.console is not None
     assert profile.console.login is not None
     assert profile.console.login.password_file == "/nonexistent/secret"
+
+
+@pytest.mark.parametrize(
+    "command",
+    ["env set bootargs quiet", "run bootcmd", "boot", "reset", "mw 0x80000000 0",
+     "sf write 0x80000000 0 0x1000", "tftp 0x80000000 image"],
+)
+def test_mutation_lint_refuses_uboot(tmp_path, command):
+    with pytest.raises(BoardConfigError) as excinfo:
+        load_board_profile(
+            _write(
+                tmp_path,
+                "device: /dev/pts/5\nactions:\n  a:\n"
+                f"    context: uboot\n    command: \"{command}\"\n",
+            )
+        )
+    assert "mutating" in str(excinfo.value)
+
+
+def test_uboot_only_tokens_allowed_in_linux(tmp_path):
+    profile = load_board_profile(
+        _write(
+            tmp_path,
+            "device: /dev/pts/5\nactions:\n  boot_files:\n"
+            "    command: \"ls /boot\"\n",
+        )
+    )
+    assert profile.console.actions["boot_files"].command == "ls /boot"
+
+
+def test_builtin_actions_pass_the_lint(tmp_path):
+    profile = load_board_profile(_write(tmp_path, "device: /dev/pts/5\n"))
+    assert {"ip_address", "system_status", "uboot_net"} <= set(profile.console.actions)

@@ -98,9 +98,20 @@ Notes:
 - **`mirror_port`** must be 1024–65535 and unique across all loaded profiles.
 - **Mutation lint:** actions are meant to be read-only. A command containing
   output redirection (`>`), `rm `, `dd `, `reboot`, `poweroff`, `shutdown`,
-  `halt`, `mkfs`, `fw_setenv`, `setenv`, `saveenv`, `mmc write`, `erase` or
-  `| sh` is refused unless the action sets `mutating: true`. relay-mcp hides
-  mutating actions unless started with `--allow-mutating-console-actions`.
+  `halt`, `mkfs`, `fw_setenv`, `setenv`, `saveenv`, `mmc write`, `erase`,
+  `| sh`, `systemctl start/stop/restart/isolate/kill`, `kill`, `tee `,
+  `sed -i`, `mv `, `chmod`, `chown`, `ip link set`, `ip addr add/del`,
+  `ip route add/del`, `ifdown`, `rmmod`, `modprobe -r`, `insmod`, `fdisk`,
+  `parted`, `flash_erase` or `nandwrite` is refused unless the action sets
+  `mutating: true`. U-Boot actions are also refused for `env set`,
+  `env save`, `env default`, `run `, `boot`, `reset`, `go `, `mw`,
+  `nand write`, `sf write`, `sf update`, `ums`, `fastboot`, `load`, `tftp` and
+  `dhcp`. relay-mcp hides mutating actions unless started with
+  `--allow-mutating-console-actions`.
+
+  The lint is an advisory blocklist, not a sandbox. The real control is that
+  board profiles are root-owned files on the Pi and agents cannot add or
+  change actions. Review every action you add.
 
 ## Built-in actions
 
