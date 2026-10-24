@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 import time
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from relay_tools.board_config import (
     BoardProfile,
@@ -12,6 +14,11 @@ from relay_tools.board_config import (
     WorkflowStepConfig,
 )
 from relay_tools.client import BoardState, RelayClient
+
+if TYPE_CHECKING:
+    from relay_tools.console.client import ConsoleClient
+
+logger = logging.getLogger(__name__)
 
 
 class BoardExecutionError(RuntimeError):
@@ -67,9 +74,20 @@ class WorkflowResult:
 class BoardController:
     """Translate board intents into relay channel operations."""
 
-    def __init__(self, profile: BoardProfile, relay_client: RelayClient) -> None:
+    def __init__(
+        self,
+        profile: BoardProfile,
+        relay_client: RelayClient,
+        *,
+        console_client: "ConsoleClient | None" = None,
+        actor: str = "relay-board",
+        audit_id: str | None = None,
+    ) -> None:
         self.profile = profile
         self.relay_client = relay_client
+        self.console_client = console_client
+        self.actor = actor
+        self.audit_id = audit_id
 
     def status(self) -> BoardStatus:
         relay_state = self.relay_client.status()
