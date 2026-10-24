@@ -346,45 +346,29 @@ class ConsoleSession:
         end = f"__RC_{nonce}_E__"
         if action.context == "linux":
             command = f"echo {begin}; {action.command}; echo {end} $?\n"
+            # The end marker must carry the exit code: a wrapped copy of the
+            # echoed command line ("__RC_..._E__ $?") must not end the capture.
+            end_re = re.compile(rf"^{end} (-?[0-9]+)$")
         else:
             command = f"echo {begin}; {action.command}; echo {end}\n"
+            end_re = re.compile(rf"^{end}$")
         tap = self.console.open_tap()
         reader = _TapReader(tap)
         try:
             self.console.write(command.encode("utf-8"))
 
             def _done(text: str) -> bool:
-                for line in text.split("\n"):
-                    stripped = line.strip()
-                    if stripped.startswith(end):
-                        return True
-                return False
+                return _scan_markers(
+                    text.split("\n"), begin, end_re, action.parse
+                )[1]
 
             finished = reader.gather(action.timeout_s, until=_done)
             lines = reader.complete_lines() + (
                 [reader.tail] if reader.tail.strip() else []
             )
-            output: list[str] = []
-            exit_code: int | None = None
-            capturing = False
-            ended = False
-            for line in lines:
-                stripped = line.strip()
-                if stripped == begin:
-                    capturing = True
-                    continue
-                if stripped.startswith(end):
-                    remainder = stripped[len(end):].strip()
-                    if remainder.isdigit() or (
-                        remainder.startswith("-") and remainder[1:].isdigit()
-                    ):
-                        exit_code = int(remainder)
-                    ended = True
-                    break
-                if capturing:
-                    if action.parse != "lines" and _KERNEL_LOG_RE.match(line):
-                        continue
-                    output.append(line)
+            output, ended, exit_code = _scan_markers(
+                lines, begin, end_re, action.parse
+            )
             if not finished or not ended:
                 raise ConsoleSessionError(
                     "timeout",
@@ -397,3 +381,34 @@ class ConsoleSession:
             return exit_code, output
         finally:
             self.console.close_tap(tap)
+
+
+def _scan_markers(
+    lines: list[str],
+    begin: str,
+    end_re: re.Pattern[str],
+    parse: str,
+) -> tuple[list[str], bool, int | None]:
+    """Cut an action's output out of the stream.
+
+    Output is the lines strictly between a line that is exactly ``begin`` and
+    the first later line matching ``end_re``. An end marker seen before the
+    begin marker is ignored. Returns ``(output, ended, exit_code)``.
+    """
+
+    output: list[str] = []
+    capturing = False
+    for line in lines:
+        stripped = line.strip()
+        if not capturing:
+            if stripped == begin:
+                capturing = True
+            continue
+        match = end_re.match(stripped)
+        if match:
+            exit_code = int(match.group(1)) if match.groups() else None
+            return output, True, exit_code
+        if parse != "lines" and _KERNEL_LOG_RE.match(line):
+            continue
+        output.append(line)
+    return output, False, None
