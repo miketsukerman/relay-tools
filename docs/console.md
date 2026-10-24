@@ -129,6 +129,14 @@ Notes:
 A profile can override any of these under `actions:` or disable one with
 `name: null`.
 
+> **U-Boot note:** the state probe sends one carriage return. At the U-Boot
+> prompt, an empty line re-runs the previous command if that command is
+> marked repeatable (for example `md`, or anything a person typed by hand).
+> Only allowlisted actions run there through relay-console, so this is
+> harmless as long as nobody is using the same console by hand. Leases in
+> bench-hub keep agents apart; keep people off a console that an agent is
+> using, or watch it through the read-only mirror.
+
 ## Boots, markers and reports
 
 Every line is sanitized (ANSI escapes and control characters stripped, long
