@@ -20,6 +20,10 @@ Includes support for the [Waveshare RPi Relay Board (B)](https://www.waveshare.c
 - **MCP server** – `relay-mcp` exposes safe, board-level power and boot-mode
   control to AI agents over the Model Context Protocol
   (see [`docs/mcp-server.md`](docs/mcp-server.md)).
+- **Serial console** – `relay-console` captures each board's debug UART,
+  splits it into boots, parses boot reports and runs named, pre-approved
+  console actions such as reading the DUT's IP address
+  (see [`docs/console.md`](docs/console.md)).
 
 ---
 
@@ -182,6 +186,28 @@ For full board profile schema details, worked YAML examples, action reference,
 and workflow tutorials, see:
 
 - [`docs/board-yaml-format.md`](docs/board-yaml-format.md)
+
+---
+
+## Serial console
+
+With an optional `console:` block in the board profile, the `relay-console`
+service (install with `pip install "relay-tools[console]"`) owns the board's
+debug UART, records everything it prints split into boots, and lets people
+and AI agents read bounded log views, parsed boot reports, and run named,
+pre-approved console actions — for example reading the DUT's IP address over
+serial when the network is unreachable:
+
+```bash
+relay-console --boards-dir /etc/relay/boards.d   # the capture service
+relay-board lab console report                   # parsed boot report
+relay-board lab console ip                       # DUT IPv4 addresses
+relay-board lab console follow                   # read-only live stream
+```
+
+There is no free-form terminal: only profile-defined commands are ever sent.
+See [`docs/console.md`](docs/console.md) for the schema, the built-in
+actions, the HTTP API, and deployment (systemd unit, udev rules, ser2net).
 
 ---
 

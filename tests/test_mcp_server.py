@@ -509,6 +509,14 @@ def test_create_server_exposes_expected_tools_and_prompts(
         "boot_and_wait",
         "run_workflow",
         "audit_log",
+        "list_boots",
+        "console_log",
+        "boot_report",
+        "wait_for_console",
+        "console_state",
+        "dut_ip_address",
+        "list_console_actions",
+        "run_console_action",
     }
     forbidden = {"on", "off", "toggle", "press", "all_on", "all_off"}
     assert not tool_names & forbidden
@@ -531,6 +539,8 @@ def test_create_server_exposes_expected_tools_and_prompts(
         "smoke_test",
         "power_cycle_and_check",
         "boot_from",
+        "check_boot",
+        "diagnose_unreachable",
     }
 
 

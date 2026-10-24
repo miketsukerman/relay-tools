@@ -26,6 +26,9 @@ gpio = [
 mcp = [
     "mcp>=1.2; python_version >= '3.10'",
 ]
+console = [
+    "pyserial>=3.5",
+]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
@@ -38,6 +41,7 @@ relay-api = "relay_tools.cli:serve_api"
 relay-client = "relay_tools.client_cli:client_cli"
 relay-board = "relay_tools.board_cli:board_cli"
 relay-mcp = "relay_tools.mcp.server:main"
+relay-console = "relay_tools.console.api:main"
 
 [tool.setuptools.packages.find]
 where = ["."]

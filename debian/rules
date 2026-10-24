@@ -21,7 +21,8 @@ override_dh_virtualenv:
 		--preinstall "wheel" \
 		--use-system-packages \
 		--extra-pip-arg=--ignore-installed \
-		--extras mcp
+		--extras mcp \
+		--extras console
 
 override_dh_install:
 	dh_install
@@ -33,6 +34,9 @@ override_dh_installsystemd:
 	# Ship the root-running unit, but let the admin review
 	# /etc/default/relay-mcp before enabling it.
 	dh_installsystemd --name=relay-mcp --no-enable --no-start
+	# Console capture is opt-in: it needs a console block in a board
+	# profile and (usually) a dialout-capable relay user first.
+	dh_installsystemd --name=relay-console --no-enable --no-start
 
 # The virtualenv ships prebuilt manylinux wheels (e.g. pydantic-core);
 # skip Debian stripping and shared-library dependency scanning for them.

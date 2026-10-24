@@ -12,7 +12,7 @@ AUDIT_LOG_ENV = "RELAY_MCP_AUDIT_LOG"
 
 
 class AuditLog:
-    """One JSON line per state-changing tool call."""
+    """One JSON line per tool call (state-changing and console/read calls)."""
 
     def __init__(self, path: str | Path = DEFAULT_AUDIT_LOG) -> None:
         self.path = Path(path).expanduser()
@@ -27,6 +27,8 @@ class AuditLog:
         error: str | None = None,
         steps: list[str] | None = None,
         matching_boot_modes: list[str] | None = None,
+        audit_id: str | None = None,
+        kind: str = "action",
     ) -> None:
         entry = {
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -37,6 +39,8 @@ class AuditLog:
             "error": error,
             "steps": steps or [],
             "matching_boot_modes": matching_boot_modes or [],
+            "audit_id": audit_id,
+            "kind": kind,
         }
         self.path.parent.mkdir(parents=True, exist_ok=True)
         with self.path.open("a", encoding="utf-8") as handle:
