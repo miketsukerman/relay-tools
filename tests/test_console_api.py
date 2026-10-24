@@ -220,6 +220,18 @@ def test_token_enforcement(shell_board):
         ).status_code
         == 200
     )
+    # The scheme is case-insensitive (RFC 6750); the token is not.
+    assert (
+        secured.get(
+            "/consoles", headers={"Authorization": "bearer s3cret"}
+        ).status_code
+        == 200
+    )
+    for bad in ("Basic s3cret", "Bearer S3CRET", "s3cret", "Bearer s3cretX"):
+        assert (
+            secured.get("/consoles", headers={"Authorization": bad}).status_code
+            == 401
+        )
 
 
 def test_main_refuses_non_loopback_without_token(tmp_path, monkeypatch):

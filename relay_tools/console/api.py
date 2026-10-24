@@ -12,6 +12,7 @@ A bearer token is read from ``RELAY_CONSOLE_TOKEN``. It is required when
 from __future__ import annotations
 
 import argparse
+import hmac
 import ipaddress
 import logging
 import os
@@ -133,7 +134,10 @@ def create_app(
         if not token:
             return
         header = request.headers.get("authorization", "")
-        if header != f"Bearer {token}":
+        scheme, _, credentials = header.partition(" ")
+        if scheme.lower() != "bearer" or not hmac.compare_digest(
+            credentials.strip().encode(), token.encode()
+        ):
             raise HTTPException(status_code=401, detail="invalid token")
 
     auth = Depends(_check_token)
