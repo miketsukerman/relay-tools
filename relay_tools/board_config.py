@@ -783,15 +783,22 @@ def _parse_console(raw_console: Any) -> ConsoleConfig | None:
     patterns_data = _require_mapping(
         console_data.get("patterns", {}), "console.patterns"
     )
+    # Profile patterns are merged over (prepended to) the built-in defaults.
     error_patterns = DEFAULT_CONSOLE_ERROR_PATTERNS
     if "errors" in patterns_data:
-        error_patterns = _parse_regex_list(
-            patterns_data["errors"], "console.patterns.errors"
+        error_patterns = (
+            _parse_regex_list(
+                patterns_data["errors"], "console.patterns.errors"
+            )
+            + DEFAULT_CONSOLE_ERROR_PATTERNS
         )
     warning_patterns = DEFAULT_CONSOLE_WARNING_PATTERNS
     if "warnings" in patterns_data:
-        warning_patterns = _parse_regex_list(
-            patterns_data["warnings"], "console.patterns.warnings"
+        warning_patterns = (
+            _parse_regex_list(
+                patterns_data["warnings"], "console.patterns.warnings"
+            )
+            + DEFAULT_CONSOLE_WARNING_PATTERNS
         )
 
     redact = _parse_regex_list(console_data.get("redact", []), "console.redact")

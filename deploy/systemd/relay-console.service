@@ -1,0 +1,47 @@
+# relay-console.service — systemd unit for the relay-tools serial console
+# capture service.
+#
+# relay-console is the only process that opens each board's debug UART. It
+# records every line to /var/lib/relay/console, split into boots, and serves
+# bounded views, boot reports and named console actions over HTTP on
+# 127.0.0.1:8001 (see docs/console.md).
+#
+# Install:
+#   sudo cp relay-console.service /etc/systemd/system/relay-console.service
+#   sudo useradd --system --home /var/lib/relay --groups dialout relay  # once
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now relay-console
+#
+# Extra flags (e.g. --host/--port) can be passed via RELAY_CONSOLE_OPTS in
+# /etc/default/relay-console. When binding to a non-loopback host, set
+# RELAY_CONSOLE_TOKEN there as well; relay-console refuses to start without it.
+
+[Unit]
+Description=Relay board serial console capture
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=relay
+Group=relay
+SupplementaryGroups=dialout
+Environment=PYTHONUNBUFFERED=1
+Environment=RELAY_CONSOLE_OPTS=
+EnvironmentFile=-/etc/default/relay-console
+# /usr/bin/relay-console is a symlink into the bundled venv.
+ExecStart=/usr/bin/relay-console --data-dir /var/lib/relay/console $RELAY_CONSOLE_OPTS
+Restart=on-failure
+RestartSec=5
+StateDirectory=relay/console
+StandardOutput=journal
+StandardError=journal
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

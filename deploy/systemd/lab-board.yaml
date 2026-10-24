@@ -85,3 +85,32 @@ boot_modes:
 #     - action: set
 #       switch: aux_power
 #       state: off
+
+# Optional serial console capture, served by the relay-console service.
+# Point `device` at the board's debug UART; prefer the stable
+# /dev/serial/by-id/... symlink over /dev/ttyUSB*. See docs/console.md.
+# console:
+#   device: /dev/serial/by-id/usb-FTDI_FT232R_USB_UART_A10KXXXX-if00-port0
+#   baud: 115200
+#   boot_banner: "U-Boot SPL"
+#   prompts:
+#     uboot: "=> "
+#     login: "login:"
+#   # patterns:                 # merged over the built-in error/warning lists
+#   #   errors: ["Failed to start my-app.service"]
+#   # redact: ["(?i)password[:=]\\s*\\S+"]
+#   retention:
+#     max_boots: 200
+#     max_megabytes: 200
+#   mirror_port: 7001           # read-only live stream:  nc <pi> 7001
+#   login:                      # needed for Linux console actions
+#     user: root
+#     # password_file: /etc/relay/secrets/lab.console   # mode 0640 or stricter
+#     shell_prompt: "[#$] $"
+#     timeout_s: 10
+#   actions:                    # merged over the built-in actions
+#     uboot_net:
+#       context: uboot
+#       command: "printenv ipaddr serverip ethaddr"
+#       parse: kv
+#       description: U-Boot network environment

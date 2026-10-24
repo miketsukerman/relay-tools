@@ -3,3 +3,5 @@ deploy/systemd/lab-board.yaml usr/share/relay-tools/examples/
 deploy/systemd/relay-daemon.service usr/lib/systemd/system/
 deploy/systemd/relay-mcp.service usr/lib/systemd/system/
 deploy/systemd/relay-mcp.env.example usr/share/relay-tools/examples/
+deploy/systemd/relay-console.service usr/lib/systemd/system/
+deploy/systemd/99-relay-console.rules usr/share/relay-tools/examples/

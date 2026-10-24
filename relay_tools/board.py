@@ -82,12 +82,14 @@ class BoardController:
         console_client: "ConsoleClient | None" = None,
         actor: str = "relay-board",
         audit_id: str | None = None,
+        board_name: str | None = None,
     ) -> None:
         self.profile = profile
         self.relay_client = relay_client
         self.console_client = console_client
         self.actor = actor
         self.audit_id = audit_id
+        self.board_name = board_name or profile.name
 
     def status(self) -> BoardStatus:
         relay_state = self.relay_client.status()
@@ -129,6 +131,7 @@ class BoardController:
             self._boot_mode_steps(mode_name, force=force),
             verify=verify,
             force=force,
+            marker_reason=f"set-boot-mode:{mode_name}",
         )
 
     def _boot_mode_steps(
@@ -196,6 +199,7 @@ class BoardController:
             self.profile.workflows[workflow_name],
             verify=verify,
             force=force,
+            marker_reason=workflow_name,
         )
 
     def power_on(self, *, verify: bool, force: bool = False) -> WorkflowResult:
@@ -287,7 +291,10 @@ class BoardController:
                     "power_on_pulse",
                 )
             )
-        return self._execute_steps(tuple(steps), verify=verify, force=force)
+        return self._execute_steps(
+            tuple(steps), verify=verify, force=force,
+            marker_reason="power-cycle",
+        )
 
     def flash_internal_memory(
         self,
@@ -370,7 +377,10 @@ class BoardController:
                     duration=boot_wait,
                 )
             )
-        return self._execute_steps(tuple(steps), verify=verify, force=force)
+        return self._execute_steps(
+            tuple(steps), verify=verify, force=force,
+            marker_reason=f"boot-{mode_name}",
+        )
 
     def _pulse_default_signal(
         self,
@@ -381,7 +391,9 @@ class BoardController:
         verify: bool,
     ) -> WorkflowResult:
         steps = self._default_power_steps(step_name, signal_name, timing_name)
-        return self._execute_steps(tuple(steps), verify=verify, force=False)
+        return self._execute_steps(
+            tuple(steps), verify=verify, force=False, marker_reason=step_name
+        )
 
     def _set_default_switch(
         self,
@@ -392,7 +404,9 @@ class BoardController:
         verify: bool,
     ) -> WorkflowResult:
         steps = self._default_switch_steps(step_name, switch_name, state)
-        return self._execute_steps(tuple(steps), verify=verify, force=False)
+        return self._execute_steps(
+            tuple(steps), verify=verify, force=False, marker_reason=step_name
+        )
 
     def _default_power_steps(
         self,
@@ -454,14 +468,61 @@ class BoardController:
             )
         ]
 
+    def _step_triggers_boot(self, step: WorkflowStepConfig) -> bool:
+        """True when a step powers on, power-cycles or resets the board."""
+
+        defaults = self.profile.defaults
+        if step.action == "set":
+            return (
+                defaults.power_switch is not None
+                and step.switch == defaults.power_switch
+                and bool(step.state)
+            )
+        if step.action == "pulse":
+            return step.signal is not None and step.signal in (
+                defaults.power_signal,
+                defaults.reset_signal,
+            )
+        return False
+
+    def _post_boot_marker(self, reason: str) -> None:
+        """Tell relay-console a boot is coming. Never fail the relay action."""
+
+        if self.console_client is None or self.profile.console is None:
+            return
+        try:
+            self.console_client.post_marker(
+                self.board_name,
+                reason=reason,
+                actor=self.actor,
+                audit_id=self.audit_id,
+            )
+        except Exception as exc:  # noqa: BLE001 - markers are best-effort
+            logger.warning(
+                "could not post boot marker for %s (%s): %s",
+                self.board_name,
+                reason,
+                exc,
+            )
+
     def _execute_steps(
         self,
         steps: tuple[WorkflowStepConfig, ...],
         *,
         verify: bool,
         force: bool,
+        marker_reason: str | None = None,
     ) -> WorkflowResult:
         executed_steps: list[ExecutedStep] = []
+        marker_posted = False
+
+        def _maybe_mark(step: WorkflowStepConfig) -> None:
+            nonlocal marker_posted
+            if marker_posted or not self._step_triggers_boot(step):
+                return
+            marker_posted = True
+            self._post_boot_marker(marker_reason or step.name)
+
         for step in steps:
             if step.action == "set-boot-mode":
                 nested_steps = self._boot_mode_steps(
@@ -469,10 +530,12 @@ class BoardController:
                     force=force,
                 )
                 for nested_step in nested_steps:
+                    _maybe_mark(nested_step)
                     executed_steps.append(
                         self._execute_step(nested_step, verify=verify)
                     )
                 continue
+            _maybe_mark(step)
             executed_steps.append(self._execute_step(step, verify=verify))
 
         return WorkflowResult(steps=tuple(executed_steps), final_status=self.status())
