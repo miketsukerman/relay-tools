@@ -95,9 +95,9 @@ class FakeDUT(threading.Thread):
             buffer += data
             while b"\r" in buffer or b"\n" in buffer:
                 line, buffer = re.split(rb"[\r\n]", buffer, maxsplit=1)
-                self._handle(line.decode(errors="replace"))
+                self._on_line(line.decode(errors="replace"))
 
-    def _handle(self, line: str) -> None:
+    def _on_line(self, line: str) -> None:
         if self.mode == "silent":
             return
         if self.mode == "booting":
