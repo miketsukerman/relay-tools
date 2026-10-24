@@ -35,9 +35,22 @@ CONSOLE_ACTION_CONTEXTS = frozenset({"linux", "uboot"})
 CONSOLE_ACTION_PARSERS = frozenset({"ipv4", "systemd", "kv", "lines"})
 # Commands with these fragments are refused unless the action sets
 # ``mutating: true``: console actions are meant to be read-only.
+# This is an advisory blocklist, not a sandbox: the real control is that
+# profiles are root-owned files on the Pi and agents cannot add actions.
 CONSOLE_MUTATION_TOKENS = (
     ">", "rm ", "dd ", "reboot", "poweroff", "shutdown", "halt",
     "mkfs", "fw_setenv", "setenv", "saveenv", "mmc write", "erase", "| sh",
+    "systemctl start", "systemctl stop", "systemctl restart",
+    "systemctl isolate", "systemctl kill", "kill", "tee ", "sed -i", "mv ",
+    "chmod", "chown", "ip link set", "ip addr add", "ip addr del",
+    "ip route add", "ip route del", "ifdown", "rmmod", "modprobe -r",
+    "fdisk", "parted", "flash_erase", "nandwrite", "insmod",
+)
+# Extra fragments refused in U-Boot actions only (too broad for Linux).
+CONSOLE_UBOOT_MUTATION_TOKENS = (
+    "env set", "env save", "env default", "run ", "boot", "reset", "go ",
+    "mw", "nand write", "sf write", "sf update", "ums", "fastboot", "load",
+    "tftp", "dhcp",
 )
 DEFAULT_CONSOLE_ERROR_PATTERNS = (
     "Kernel panic",
@@ -644,7 +657,10 @@ def _parse_console_action(
     if not isinstance(mutating, bool):
         raise BoardConfigError(f"{context_path}.mutating must be a boolean.")
     if not mutating:
-        for token in CONSOLE_MUTATION_TOKENS:
+        tokens = CONSOLE_MUTATION_TOKENS
+        if context == "uboot":
+            tokens = tokens + CONSOLE_UBOOT_MUTATION_TOKENS
+        for token in tokens:
             if token in command:
                 raise BoardConfigError(
                     f"{context_path}.command contains {token.strip()!r}, which "
