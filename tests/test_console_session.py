@@ -57,6 +57,7 @@ class FakeDUT(threading.Thread):
         respond_to_login: bool = True,
         kernel_noise: bool = False,
         swallow_end_marker: bool = False,
+        wrapped_echo: bool = False,
     ) -> None:
         super().__init__(daemon=True)
         self.master = master_fd
@@ -65,6 +66,7 @@ class FakeDUT(threading.Thread):
         self.respond_to_login = respond_to_login
         self.kernel_noise = kernel_noise
         self.swallow_end_marker = swallow_end_marker
+        self.wrapped_echo = wrapped_echo
         self.received = b""
         self.awaiting_password = False
         self.logged_in = mode == "shell"
@@ -130,7 +132,13 @@ class FakeDUT(threading.Thread):
         if line == "":
             self._send("root@imx93:~# ")
             return
-        self._send(line + "\r\n")  # terminal echo
+        cut = line.find("__RC_", line.find("__RC_") + 1)
+        if self.wrapped_echo and cut > 0:
+            # Terminal echo wrapped so that the end marker of the echoed
+            # command line starts a line of its own, before any output.
+            self._send(line[:cut] + "\r\n" + line[cut:] + "\r\n")
+        else:
+            self._send(line + "\r\n")  # terminal echo
         self._run_commands(line)
         self._send("root@imx93:~# ")
 
@@ -405,6 +413,29 @@ def test_kernel_noise_dropped_unless_lines(dut_factory):
     )
     result = ConsoleSession(console).run_action(lines_action)
     assert any("link is up" in line for line in result["untrusted_output"])
+
+
+def test_wrapped_echo_does_not_end_capture_early(dut_factory):
+    dut, console = dut_factory(
+        "shell", config_kwargs={"login": LOGIN}, wrapped_echo=True
+    )
+    result = ConsoleSession(console).run_action(IP_ACTION)
+    assert result["exit_code"] == 0
+    assert result["parsed"], result
+
+
+def test_scan_markers_ignores_end_before_begin():
+    begin = "__RC_ab_B__"
+    end_re = re.compile(r"^__RC_ab_E__ (-?[0-9]+)$")
+    lines = [
+        "root@imx93:~# echo __RC_ab_B__; uname -a;",
+        "__RC_ab_E__ $?",
+        "__RC_ab_B__",
+        "Linux imx93 6.18.20",
+        "__RC_ab_E__ 0",
+    ]
+    output, ended, code = session_mod._scan_markers(lines, begin, end_re, "lines")
+    assert (output, ended, code) == (["Linux imx93 6.18.20"], True, 0)
 
 
 def test_end_marker_timeout(dut_factory):
