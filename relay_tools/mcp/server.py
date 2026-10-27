@@ -142,11 +142,29 @@ class Settings:
     )
 
 
-def _status_payload(status: BoardStatus) -> dict[str, Any]:
+def _power_state(profile: BoardProfile, status: BoardStatus) -> str:
+    """Derive the logical power state from the profile's power switch.
+
+    Returns "on"/"off" based on the logical (polarity-aware) switch state,
+    or "unknown" when the profile has no power switch or the switch is
+    missing from the status. Never derived from raw channel states.
+    """
+    power_switch = profile.defaults.power_switch
+    if power_switch is None:
+        return "unknown"
+    state = status.switches.get(power_switch)
+    if state is None:
+        return "unknown"
+    return "on" if state else "off"
+
+
+def _status_payload(profile: BoardProfile, status: BoardStatus) -> dict[str, Any]:
     return {
         "signals": dict(status.signals),
         "switches": dict(status.switches),
         "matching_boot_modes": list(status.matching_boot_modes),
+        "power": _power_state(profile, status),
+        "power_switch": profile.defaults.power_switch,
     }
 
 
@@ -395,7 +413,7 @@ class RelayMCPService:
                     {"name": step.name, "detail": step.detail}
                     for step in result.steps
                 ],
-                "final_status": _status_payload(result.final_status),
+                "final_status": _status_payload(profile, result.final_status),
             }
         finally:
             lock.release()
@@ -480,7 +498,7 @@ class RelayMCPService:
                 status = BoardController(profile, client).status()
         except Exception as exc:  # noqa: BLE001 - mapped below
             raise self._map_error(exc) from exc
-        payload = _status_payload(status)
+        payload = _status_payload(profile, status)
         payload["board"] = path.stem
         payload["channels"] = {
             str(channel): on
@@ -885,7 +903,9 @@ def create_server(settings: Settings) -> Any:
     @mcp_server.tool(annotations=read_only)
     def board_status(board: str | None = None) -> dict:
         """Read the live board state: signals, switches, matching boot
-        modes and raw relay channel states."""
+        modes and raw relay channel states. Also reports power
+        ("on"/"off"/"unknown") and power_switch, derived from the logical
+        state of the profile's power switch, not measured at the DUT."""
         return service.board_status(board)
 
     @mcp_server.tool(annotations=action)

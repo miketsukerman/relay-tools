@@ -221,8 +221,17 @@ def _resolve_verify(controller: BoardController, verify: bool | None) -> bool:
 def cmd_status(ctx: click.Context) -> None:
     """Show current board signal/switch state and matching boot modes."""
 
+    power: list[str] = []
+
     def _callback(controller: BoardController) -> WorkflowResult:
         board_status = controller.status()
+        power_switch = controller.profile.defaults.power_switch
+        state = (
+            board_status.switches.get(power_switch)
+            if power_switch is not None
+            else None
+        )
+        power.append("unknown" if state is None else ("on" if state else "off"))
         return WorkflowResult(steps=tuple(), final_status=board_status)
 
     result = _run_board_action(
@@ -234,6 +243,8 @@ def cmd_status(ctx: click.Context) -> None:
     )
     if result is not None:
         _emit_result(result)
+        if power:
+            click.echo(f"Power: {power[0]}")
 
 
 @board_cli.command("power-on")
