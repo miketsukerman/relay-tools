@@ -78,7 +78,7 @@ from `RELAY_BOARD_DEFAULT` / `RELAY_BOARD_CONFIG`).
 |---|---|
 | `list_boards` | List board profiles in the config dir; invalid files are skipped and their errors reported |
 | `describe_board` | Signals, switches, boot modes (with `risky` flag), workflows, timings and defaults — profile only, no daemon call |
-| `board_status` | Live signals, switches, `matching_boot_modes` and raw channel states |
+| `board_status` | Live signals, switches, `matching_boot_modes`, raw channel states, plus `power` (`on`/`off`/`unknown`) and `power_switch`, derived from the profile's power switch (not measured at the DUT) |
 | `power_on` / `power_off` / `power_cycle` / `reset` | The profile's power/reset actions (`power_off` is marked destructive) |
 | `set_boot_mode(mode)` | Set a boot mode's strap signals/switches; risky modes are refused |
 | `boot_and_wait(mode)` | Set a boot mode, power-cycle, wait for the profile's `boot_wait` |

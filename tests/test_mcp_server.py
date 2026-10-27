@@ -56,6 +56,11 @@ boot_modes:
       boot0: on
       boot1: on
 workflows:
+  power-off:
+    - name: cut-power
+      action: set
+      switch: power
+      state: off
   power-cycle:
     - name: cut-power
       action: set
@@ -219,6 +224,57 @@ def test_board_status_reports_channels_and_modes(service, daemon) -> None:
     assert result["switches"]["power"] is False
     assert "emmc" in result["matching_boot_modes"]
     assert result["channels"]["5"] is False
+
+
+def test_board_status_power_on(service, daemon) -> None:
+    daemon.state[5] = True
+    result = service.board_status("lab")
+    assert result["power"] == "on"
+    assert result["power_switch"] == "power"
+
+
+def test_board_status_power_off(service, daemon) -> None:
+    daemon.state[5] = False
+    result = service.board_status("lab")
+    assert result["power"] == "off"
+    assert result["power_switch"] == "power"
+
+
+def test_board_status_power_uses_logical_state_for_active_low(
+    board_dir, daemon, tmp_path
+) -> None:
+    profile = PROFILE_YAML.replace(
+        "  power:\n    channel: 5\n",
+        "  power:\n    channel: 5\n    active: off\n",
+    )
+    assert "active: off" in profile
+    (board_dir / "lab.yaml").write_text(profile)
+    service = _service(board_dir, daemon, tmp_path)
+    daemon.state[5] = False
+    result = service.board_status("lab")
+    assert result["channels"]["5"] is False
+    assert result["power"] == "on"
+    daemon.state[5] = True
+    result = service.board_status("lab")
+    assert result["power"] == "off"
+
+
+def test_board_status_power_unknown_without_power_switch(
+    board_dir, daemon, tmp_path
+) -> None:
+    profile = PROFILE_YAML.replace("  power_switch: power\n", "")
+    (board_dir / "lab.yaml").write_text(profile)
+    service = _service(board_dir, daemon, tmp_path)
+    result = service.board_status("lab")
+    assert result["power"] == "unknown"
+    assert result["power_switch"] is None
+
+
+def test_run_workflow_final_status_reports_power(service, daemon) -> None:
+    daemon.state[5] = True
+    result = service.run_workflow("power-off", "lab")
+    assert result["final_status"]["power"] == "off"
+    assert result["final_status"]["power_switch"] == "power"
 
 
 # ---------------------------------------------------------------------------
