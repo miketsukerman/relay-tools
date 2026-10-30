@@ -24,6 +24,9 @@ Includes support for the [Waveshare RPi Relay Board (B)](https://www.waveshare.c
   splits it into boots, parses boot reports and runs named, pre-approved
   console actions such as reading the DUT's IP address
   (see [`docs/console.md`](docs/console.md)).
+- **Screen capture** – `relay-capture` grabs the DUT's HDMI output through a
+  USB capture dongle: screenshots, live MJPEG stream and MKV recordings
+  (see [`docs/capture.md`](docs/capture.md)).
 
 ---
 
@@ -208,6 +211,28 @@ relay-board lab console follow                   # read-only live stream
 There is no free-form terminal: only profile-defined commands are ever sent.
 See [`docs/console.md`](docs/console.md) for the schema, the built-in
 actions, the HTTP API, and deployment (systemd unit, udev rules, ser2net).
+
+---
+
+## Screen capture
+
+With a UVC HDMI-to-USB dongle (for example a UGREEN CM629) on the DUT's HDMI
+output, the `relay-capture` daemon serves screenshots, a browser-viewable
+live MJPEG stream and MKV recordings of the DUT's screen — without decoding
+any video on the Pi (pure ffmpeg stream copy). Especially useful for
+watching the DUT boot; start the capture before powering the DUT on so it
+sees HDMI hot-plug at boot.
+
+```bash
+relay-capture                                      # the capture daemon
+curl -o s.jpg localhost:8002/capture/snapshot      # screenshot
+relay-client capture record-start --name boot      # record a boot ...
+relay-client capture record-stop                   # ... to an MKV file
+```
+
+AI agents get a read-only `dut_screenshot` MCP tool from `relay-mcp`. See
+[`docs/capture.md`](docs/capture.md) for hardware setup, the HTTP API,
+deployment and troubleshooting.
 
 ---
 

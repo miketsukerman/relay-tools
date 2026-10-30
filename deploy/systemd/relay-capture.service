@@ -1,0 +1,46 @@
+# relay-capture.service — systemd unit for the relay-tools HDMI screen
+# capture daemon.
+#
+# relay-capture reads MJPEG frames from a UVC HDMI-to-USB capture dongle
+# (e.g. UGREEN CM629) with one long-lived ffmpeg process and serves
+# screenshots, a live MJPEG stream and MKV recordings over HTTP on
+# 0.0.0.0:8002 (see docs/capture.md).
+#
+# Install:
+#   sudo cp relay-capture.service /etc/systemd/system/relay-capture.service
+#   sudo cp relay-capture.env.example /etc/default/relay-capture
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now relay-capture
+#
+# Extra flags (e.g. --device/--size/--fps/--host/--port) can be passed via
+# RELAY_CAPTURE_OPTS in /etc/default/relay-capture. Recordings go to
+# /var/lib/relay-capture (StateDirectory).
+
+[Unit]
+Description=Relay DUT HDMI screen capture daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+SupplementaryGroups=video audio
+Environment=PYTHONUNBUFFERED=1
+Environment=RELAY_CAPTURE_OPTS=
+EnvironmentFile=-/etc/default/relay-capture
+# /usr/bin/relay-capture is a symlink into the bundled venv.
+ExecStart=/usr/bin/relay-capture $RELAY_CAPTURE_OPTS
+Restart=on-failure
+RestartSec=5
+StateDirectory=relay-capture
+StandardOutput=journal
+StandardError=journal
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

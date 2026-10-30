@@ -37,6 +37,12 @@ import logging
 
 import click
 
+from .capture.client import (
+    CAPTURE_URL_ENV,
+    DEFAULT_CAPTURE_URL,
+    CaptureClient,
+    CaptureClientError,
+)
 from .client import (
     DEFAULT_URL,
     RelayClient,
@@ -205,6 +211,115 @@ def cmd_all_off(ctx: click.Context) -> None:
     except RelayClientError as exc:
         raise click.ClickException(str(exc)) from exc
     click.echo("All channels: OFF")
+
+
+# ---------------------------------------------------------------------------
+# Capture commands (relay-capture daemon)
+# ---------------------------------------------------------------------------
+
+
+@client_cli.group("capture")
+@click.option(
+    "--capture-url",
+    default=DEFAULT_CAPTURE_URL,
+    show_default=True,
+    envvar=CAPTURE_URL_ENV,
+    help="Base URL of the relay-capture daemon.",
+)
+@click.pass_context
+def capture_group(ctx: click.Context, capture_url: str) -> None:
+    """Interact with the relay-capture screen capture daemon."""
+    ctx.ensure_object(dict)
+    ctx.obj["capture_url"] = capture_url
+
+
+def _capture_client(ctx: click.Context) -> CaptureClient:
+    """Return a relay-capture daemon client."""
+    return CaptureClient(ctx.obj["capture_url"])
+
+
+@capture_group.command("snapshot")
+@click.option(
+    "--output",
+    "-o",
+    type=click.Path(dir_okay=False, writable=True),
+    required=True,
+    help="File the JPEG snapshot is written to.",
+)
+@click.option(
+    "--timeout",
+    type=click.FloatRange(min=0.1, max=60),
+    default=3.0,
+    show_default=True,
+    help="Seconds to wait for the next frame.",
+)
+@click.pass_context
+def cmd_capture_snapshot(ctx: click.Context, output: str, timeout: float) -> None:
+    """Save a screenshot of the DUT to OUTPUT."""
+    logger.debug("relay-client capture snapshot via %s", ctx.obj["capture_url"])
+    try:
+        with _capture_client(ctx) as client:
+            jpeg, _ = client.snapshot(timeout=timeout)
+    except CaptureClientError as exc:
+        raise click.ClickException(str(exc)) from exc
+    with open(output, "wb") as handle:
+        handle.write(jpeg)
+    click.echo(f"Snapshot saved to {output} ({len(jpeg)} bytes)")
+
+
+@capture_group.command("record-start")
+@click.option(
+    "--name",
+    default=None,
+    help="Recording name (defaults to a timestamp).",
+)
+@click.pass_context
+def cmd_capture_record_start(ctx: click.Context, name: str | None) -> None:
+    """Start recording the DUT screen to an MKV file."""
+    logger.debug(
+        "relay-client capture record-start via %s", ctx.obj["capture_url"]
+    )
+    try:
+        with _capture_client(ctx) as client:
+            data = client.record_start(name)
+    except CaptureClientError as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(f"Recording started: {data['file']}")
+
+
+@capture_group.command("record-stop")
+@click.pass_context
+def cmd_capture_record_stop(ctx: click.Context) -> None:
+    """Stop the active recording and finalize the MKV file."""
+    logger.debug(
+        "relay-client capture record-stop via %s", ctx.obj["capture_url"]
+    )
+    try:
+        with _capture_client(ctx) as client:
+            data = client.record_stop()
+    except CaptureClientError as exc:
+        raise click.ClickException(str(exc)) from exc
+    if data.get("file"):
+        click.echo(f"Recording saved: {data['file']}")
+    else:
+        click.echo("No recording was active.")
+
+
+@capture_group.command("status")
+@click.pass_context
+def cmd_capture_status(ctx: click.Context) -> None:
+    """Print the capture pipeline status."""
+    logger.debug("relay-client capture status via %s", ctx.obj["capture_url"])
+    try:
+        with _capture_client(ctx) as client:
+            data = client.status()
+    except CaptureClientError as exc:
+        raise click.ClickException(str(exc)) from exc
+    age = data.get("last_frame_age_s")
+    click.echo(f"  Device:     {data.get('device')}")
+    click.echo(f"  FPS:        {data.get('fps')}")
+    click.echo(f"  Last frame: {age if age is not None else 'never'}")
+    click.echo(f"  Recording:  {data.get('recording') or 'no'}")
 
 
 # ---------------------------------------------------------------------------

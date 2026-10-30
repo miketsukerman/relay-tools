@@ -573,6 +573,7 @@ def test_create_server_exposes_expected_tools_and_prompts(
         "dut_ip_address",
         "list_console_actions",
         "run_console_action",
+        "dut_screenshot",
     }
     forbidden = {"on", "off", "toggle", "press", "all_on", "all_off"}
     assert not tool_names & forbidden
