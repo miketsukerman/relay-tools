@@ -15,6 +15,7 @@ Package: relay-tools
 Architecture: any
 Depends:
  ${misc:Depends},
+ ffmpeg,
  python3,
 Recommends:
  python3-gpiozero,

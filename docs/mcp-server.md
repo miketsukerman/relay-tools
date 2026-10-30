@@ -50,6 +50,7 @@ All logging goes to stderr; on stdio, stdout carries the MCP protocol.
 | `--audit-log` | `RELAY_MCP_AUDIT_LOG` | `~/.local/state/relay-mcp/audit.jsonl` | Audit log path |
 | `--read-only` | `RELAY_MCP_READ_ONLY=1` | off | Refuse every state-changing tool |
 | `--allow-board` | – | all boards | Limit the exposed boards (repeatable) |
+| `--capture-url` | `RELAY_CAPTURE_URL` | `http://localhost:8002` | relay-capture daemon URL (for `dut_screenshot`) |
 | `--transport` | – | `stdio` | `stdio` or `http` |
 | `--host` / `--port` | – | `127.0.0.1` / `8766` | HTTP bind address |
 
@@ -84,6 +85,7 @@ from `RELAY_BOARD_DEFAULT` / `RELAY_BOARD_CONFIG`).
 | `boot_and_wait(mode)` | Set a boot mode, power-cycle, wait for the profile's `boot_wait` |
 | `run_workflow(workflow)` | Run a named workflow from the profile |
 | `audit_log(limit=20)` | Newest audit entries, limit clamped to 1..200 |
+| `dut_screenshot(timeout_s=3)` | Screenshot of the DUT's HDMI output as a JPEG image, fetched from the `relay-capture` daemon (`--capture-url` / `RELAY_CAPTURE_URL`, default `http://localhost:8002`). Read-only, so it also works with `--read-only`. Fails when the capture daemon is down or the DUT emits no HDMI signal. See [`capture.md`](capture.md). |
 
 Prompts (shown as slash commands in most clients): `smoke_test`,
 `power_cycle_and_check(board)`, `boot_from(board, mode)`.

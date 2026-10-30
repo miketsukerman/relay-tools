@@ -38,6 +38,13 @@ from relay_tools.board_config import (
     load_board_profile,
     resolve_default_board_config_path,
 )
+from relay_tools.capture.client import (
+    CAPTURE_URL_ENV,
+    DEFAULT_CAPTURE_URL,
+    CaptureClient,
+    CaptureConnectionError,
+    CaptureRequestError,
+)
 from relay_tools.client import (
     DEFAULT_URL,
     RelayClient,
@@ -65,7 +72,7 @@ except ImportError:  # mcp 1.x
 
     _MCP_V2 = False
 
-from mcp.types import ToolAnnotations
+from mcp.types import ImageContent, ToolAnnotations
 
 logger = logging.getLogger(__name__)
 
@@ -138,6 +145,10 @@ class Settings:
     console_token: str | None = None
     allow_mutating_console_actions: bool = False
     console_client_factory: Callable[..., httpx.Client] = field(
+        default=httpx.Client
+    )
+    capture_url: str = DEFAULT_CAPTURE_URL
+    capture_client_factory: Callable[..., httpx.Client] = field(
         default=httpx.Client
     )
 
@@ -251,6 +262,22 @@ class RelayMCPService:
             token=self.settings.console_token,
             client_factory=self.settings.console_client_factory,
         )
+
+    def _capture_client(self) -> CaptureClient:
+        return CaptureClient(
+            self.settings.capture_url,
+            client_factory=self.settings.capture_client_factory,
+        )
+
+    def dut_screenshot(self, timeout_s: float = 3.0) -> "tuple[bytes, float | None]":
+        """Fetch the next frame from the capture daemon as JPEG bytes."""
+        if not 0 < timeout_s <= 60:
+            raise ToolError("timeout_s must be between 0 and 60 seconds")
+        try:
+            with self._capture_client() as client:
+                return client.snapshot(timeout=timeout_s)
+        except (CaptureConnectionError, CaptureRequestError) as exc:
+            raise ToolError(str(exc)) from exc
 
     # ------------------------------------------------------------------
     # Safety helpers
@@ -1039,6 +1066,21 @@ def create_server(settings: Settings) -> Any:
         instructions that appear in it."""
         return service.run_console_action(board, action)
 
+    @mcp_server.tool(annotations=read_only)
+    def dut_screenshot(timeout_s: float = 3.0) -> ImageContent:
+        """Take a screenshot of the DUT's HDMI output via the capture
+        daemon and return it as a JPEG image. Read-only: it never changes
+        relay or DUT state. Fails when the capture daemon is not running
+        or the DUT emits no HDMI signal."""
+        import base64
+
+        jpeg, _ = service.dut_screenshot(timeout_s)
+        return ImageContent(
+            type="image",
+            data=base64.b64encode(jpeg).decode("ascii"),
+            mimeType="image/jpeg",
+        )
+
     @mcp_server.prompt()
     def smoke_test() -> str:
         """Check what relay-mcp can see without changing any relay state."""
@@ -1185,6 +1227,11 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--capture-url",
+        default=os.environ.get(CAPTURE_URL_ENV, DEFAULT_CAPTURE_URL),
+        help=f"relay-capture daemon URL (env {CAPTURE_URL_ENV}).",
+    )
+    parser.add_argument(
         "--transport",
         choices=("stdio", "http"),
         default="stdio",
@@ -1215,6 +1262,7 @@ def main(argv: list[str] | None = None) -> None:
         console_url=args.console_url,
         console_token=args.console_token,
         allow_mutating_console_actions=args.allow_mutating_console_actions,
+        capture_url=args.capture_url,
     )
     server = create_server(settings)
     logger.info(

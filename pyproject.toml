@@ -42,6 +42,7 @@ relay-client = "relay_tools.client_cli:client_cli"
 relay-board = "relay_tools.board_cli:board_cli"
 relay-mcp = "relay_tools.mcp.server:main"
 relay-console = "relay_tools.console.api:main"
+relay-capture = "relay_tools.capture.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
