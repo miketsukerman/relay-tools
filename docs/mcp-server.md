@@ -82,10 +82,39 @@ from `RELAY_BOARD_DEFAULT` / `RELAY_BOARD_CONFIG`).
 | `board_status` | Live signals, switches, `matching_boot_modes`, raw channel states, plus `power` (`on`/`off`/`unknown`) and `power_switch`, derived from the profile's power switch (not measured at the DUT) |
 | `power_on` / `power_off` / `power_cycle` / `reset` | The profile's power/reset actions (`power_off` is marked destructive) |
 | `set_boot_mode(mode)` | Set a boot mode's strap signals/switches; risky modes are refused |
-| `boot_and_wait(mode)` | Set a boot mode, power-cycle, wait for the profile's `boot_wait` |
-| `run_workflow(workflow)` | Run a named workflow from the profile |
+| `boot_and_wait(mode)` | Set a boot mode, power-cycle, wait for the profile's `boot_wait`. Blocks until done — don't poll `board_status` while it runs |
+| `run_workflow(workflow)` | Run a named workflow from the profile. Blocks until the workflow is done |
 | `audit_log(limit=20)` | Newest audit entries, limit clamped to 1..200 |
 | `dut_screenshot(timeout_s=3)` | Screenshot of the DUT's HDMI output as a JPEG image, fetched from the `relay-capture` daemon (`--capture-url` / `RELAY_CAPTURE_URL`, default `http://localhost:8002`). Read-only, so it also works with `--read-only`. Fails when the capture daemon is down or the DUT emits no HDMI signal. See [`capture.md`](capture.md). |
+
+The serial-console tools (`list_boots`, `console_log`, `boot_report`,
+`wait_for_console`, `console_state`, `dut_ip_address`,
+`list_console_actions`, `run_console_action`) are described in
+[`console.md`](console.md). The tool count is unchanged by the progress and
+`wait_s` additions below: `wait_s` is a new argument on the existing
+`dut_ip_address` tool, not a new tool.
+
+### Long calls: progress instead of polling
+
+`wait_for_console`, `boot_and_wait`, `run_workflow` and
+`dut_ip_address(wait_s > 0)` block until they are done. Agents should not
+poll `board_status` or `console_state` while one of them runs. When the
+client sends a progress token with the request, the server sends an MCP
+progress notification every 10 seconds naming the current step (for example
+`power-cycle`, `waiting for 'login:'`) and the elapsed time, so clients and
+proxies see the connection is alive. Progress messages never contain console
+output, which is untrusted. Without a progress token the calls behave as
+before; a failed notification never fails the call.
+
+`dut_ip_address(board, wait_s=0)` accepts `wait_s` (clamped to 0..300).
+With `wait_s > 0` — use for example `wait_s=120` right after a boot instead
+of calling the tool repeatedly — it blocks until relay-console has seen an
+IPv4 address for the current boot or `wait_s` passes, waiting on the console
+event stream rather than polling. The result carries the usual payload plus
+`waited_s` and `found`; with `found: false` it adds the hint
+`no address yet; check boot_report or wait_for_console`. The console
+cooldown and the per-board lock apply while it waits. `wait_s = 0` keeps the
+previous behaviour.
 
 Prompts (shown as slash commands in most clients): `smoke_test`,
 `power_cycle_and_check(board)`, `boot_from(board, mode)`.

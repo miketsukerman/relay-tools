@@ -45,6 +45,9 @@ class FakeConsoleService:
 
     def __init__(self) -> None:
         self.requests: list[httpx.Request] = []
+        self.report_addresses: list[str] = ["192.168.3.141"]
+        self.wait_matched = True
+        self.on_wait = None
         self.action_result: dict = {
             "board": "lab",
             "action": "ip_address",
@@ -93,16 +96,18 @@ class FakeConsoleService:
                     "board": "lab",
                     "boot": 2,
                     "result": "login_reached",
-                    "addresses_seen": ["192.168.3.141"],
+                    "addresses_seen": list(self.report_addresses),
                 },
             )
         if path == "/consoles/lab/wait":
+            if self.on_wait is not None:
+                self.on_wait()
             return httpx.Response(
                 200,
                 json={
                     "board": "lab",
-                    "matched": True,
-                    "match": "login:",
+                    "matched": self.wait_matched,
+                    "match": "login:" if self.wait_matched else None,
                     "elapsed_s": 3.0,
                     "untrusted_lines": ["before"],
                 },
@@ -297,6 +302,106 @@ def test_dut_ip_address_fallback_when_not_in_linux(
     assert result["state"] == "uboot"
     assert result["addresses_seen"] == ["192.168.3.141"]
     assert "hint" in result
+
+
+def _not_in_linux(console_service):
+    console_service.action_result = {
+        "board": "lab",
+        "action": "ip_address",
+        "error": "wrong_context",
+        "message": "board is still booting",
+        "state": "booting",
+    }
+    console_service.report_addresses = []
+
+
+def test_dut_ip_address_wait_s_zero_keeps_old_payload(service):
+    result = service.dut_ip_address("lab", wait_s=0)
+    assert result["addresses"][0]["address"] == "192.168.3.141"
+    assert "found" not in result
+    assert "waited_s" not in result
+
+
+def test_dut_ip_address_waits_until_address_appears(
+    board_dir, console_service, tmp_path
+):
+    _not_in_linux(console_service)
+
+    def _address_appears():
+        console_service.report_addresses = ["192.168.3.141"]
+
+    console_service.on_wait = _address_appears
+    service = _service(board_dir, console_service, tmp_path)
+    result = service.dut_ip_address("lab", wait_s=120)
+    assert result["found"] is True
+    assert result["addresses_seen"] == ["192.168.3.141"]
+    assert result["waited_s"] < 120
+    wait_requests = [
+        request
+        for request in console_service.requests
+        if request.url.path == "/consoles/lab/wait"
+    ]
+    assert len(wait_requests) == 1
+
+
+def test_dut_ip_address_wait_no_address_reports_hint(
+    board_dir, console_service, tmp_path
+):
+    _not_in_linux(console_service)
+    console_service.wait_matched = False
+    service = _service(board_dir, console_service, tmp_path)
+    result = service.dut_ip_address("lab", wait_s=5)
+    assert result["found"] is False
+    assert result["addresses"] == []
+    assert result["hint"] == (
+        "no address yet; check boot_report or wait_for_console"
+    )
+    assert "waited_s" in result
+
+
+def test_dut_ip_address_wait_s_is_clamped(
+    board_dir, console_service, tmp_path
+):
+    _not_in_linux(console_service)
+    console_service.wait_matched = False
+    service = _service(board_dir, console_service, tmp_path)
+    service.dut_ip_address("lab", wait_s=9999)
+    wait_request = next(
+        request
+        for request in console_service.requests
+        if request.url.path == "/consoles/lab/wait"
+    )
+    assert float(wait_request.url.params["timeout_s"]) <= 300
+
+
+def test_dut_ip_address_wait_skips_wait_when_address_known(
+    service, console_service
+):
+    result = service.dut_ip_address("lab", wait_s=120)
+    assert result["found"] is True
+    assert result["addresses"][0]["address"] == "192.168.3.141"
+    assert all(
+        request.url.path != "/consoles/lab/wait"
+        for request in console_service.requests
+    )
+
+
+def test_dut_ip_address_wait_respects_console_cooldown(service):
+    service.console_state("lab")
+    with pytest.raises(ToolError, match="cooldown"):
+        service.dut_ip_address("lab", wait_s=5)
+
+
+def test_dut_ip_address_wait_respects_board_lock(service):
+    lock = service._board_lock("lab")
+    assert lock.acquire(blocking=False)
+    try:
+        with pytest.raises(ToolError, match="busy"):
+            service.dut_ip_address("lab", wait_s=5)
+        # wait_s=0 keeps today's behaviour and does not take the lock.
+        assert service.dut_ip_address("lab")["addresses"]
+    finally:
+        lock.release()
 
 
 def test_service_unreachable_maps_to_tool_error(board_dir, tmp_path):

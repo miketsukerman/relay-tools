@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import httpx
@@ -581,7 +582,9 @@ def test_create_server_exposes_expected_tools_and_prompts(
         schema = getattr(
             tool, "input_schema", getattr(tool, "inputSchema", None)
         )
-        assert "force" not in ((schema or {}).get("properties") or {})
+        properties = (schema or {}).get("properties") or {}
+        assert "force" not in properties
+        assert "ctx" not in properties
     by_name = {tool.name: tool for tool in tools}
 
     def _hint(tool, snake, camel):
@@ -599,6 +602,170 @@ def test_create_server_exposes_expected_tools_and_prompts(
         "check_boot",
         "diagnose_unreachable",
     }
+
+
+# ---------------------------------------------------------------------------
+# Progress notifications
+# ---------------------------------------------------------------------------
+
+
+CONSOLE_PROFILE_YAML = """
+name: lab-console
+switches:
+  power:
+    channel: 5
+defaults:
+  power_switch: power
+console:
+  device: /dev/pts/5
+"""
+
+
+@asynccontextmanager
+async def _client_session(server):
+    """Connect an in-memory MCP client to the server (both SDK gens)."""
+    from mcp import ClientSession
+
+    try:  # mcp >= 2.0
+        from mcp.client._memory import InMemoryTransport
+    except ImportError:  # mcp 1.x
+        from mcp.shared.memory import (
+            create_connected_server_and_client_session,
+        )
+
+        async with create_connected_server_and_client_session(
+            server._mcp_server
+        ) as session:
+            yield session
+        return
+    async with InMemoryTransport(server) as (read, write):
+        async with ClientSession(read, write) as session:
+            await session.initialize()
+            yield session
+
+
+def _progress_collector():
+    messages = []
+
+    async def _callback(progress, total, message=None):
+        messages.append(message)
+
+    return messages, _callback
+
+
+def _slow_console_transport(delay_s: float) -> httpx.MockTransport:
+    import time as _time
+
+    def handle(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/consoles/lab/wait":
+            _time.sleep(delay_s)
+            return httpx.Response(
+                200,
+                json={
+                    "board": "lab",
+                    "matched": True,
+                    "match": "login:",
+                    "elapsed_s": delay_s,
+                    "untrusted_lines": ["SECRET-CONSOLE-LINE login:"],
+                },
+            )
+        return httpx.Response(404, json={"detail": "not found"})
+
+    return httpx.MockTransport(handle)
+
+
+async def test_wait_for_console_sends_progress(
+    board_dir, daemon, tmp_path, monkeypatch
+):
+    import relay_tools.mcp.server as server_module
+
+    monkeypatch.setattr(server_module, "PROGRESS_INTERVAL_S", 0.05)
+    (board_dir / "lab.yaml").write_text(CONSOLE_PROFILE_YAML)
+    transport = _slow_console_transport(0.5)
+    server = create_server(
+        Settings(
+            config_dir=board_dir,
+            audit_log=tmp_path / "audit.jsonl",
+            client_factory=lambda **kwargs: httpx.Client(
+                transport=daemon.transport(), **kwargs
+            ),
+            console_client_factory=lambda **kwargs: httpx.Client(
+                transport=transport, **kwargs
+            ),
+        )
+    )
+    messages, callback = _progress_collector()
+    async with _client_session(server) as session:
+        result = await session.call_tool(
+            "wait_for_console",
+            {"board": "lab", "pattern": "login:", "timeout_s": 30},
+            progress_callback=callback,
+        )
+    assert json.loads(result.content[0].text)["matched"] is True
+    assert messages, "expected at least one progress notification"
+    assert any("waiting for 'login:'" in message for message in messages)
+    assert any("elapsed" in message for message in messages)
+    # Console output is untrusted and must never leak into progress.
+    assert all("SECRET" not in message for message in messages)
+
+
+async def test_boot_and_wait_sends_progress(
+    board_dir, daemon, tmp_path, monkeypatch
+):
+    import relay_tools.mcp.server as server_module
+
+    monkeypatch.setattr(server_module, "PROGRESS_INTERVAL_S", 0.05)
+    (board_dir / "lab.yaml").write_text(
+        PROFILE_YAML.replace("boot_wait: 0.01", "boot_wait: 0.5")
+    )
+    server = create_server(
+        Settings(
+            config_dir=board_dir,
+            audit_log=tmp_path / "audit.jsonl",
+            client_factory=lambda **kwargs: httpx.Client(
+                transport=daemon.transport(), **kwargs
+            ),
+        )
+    )
+    messages, callback = _progress_collector()
+    async with _client_session(server) as session:
+        result = await session.call_tool(
+            "boot_and_wait",
+            {"mode": "sd", "board": "lab"},
+            progress_callback=callback,
+        )
+    assert json.loads(result.content[0].text)["ok"] is True
+    assert messages, "expected at least one progress notification"
+    assert any("elapsed" in message for message in messages)
+
+
+async def test_blocking_tools_work_without_progress_token(
+    board_dir, daemon, tmp_path, monkeypatch
+):
+    import relay_tools.mcp.server as server_module
+
+    monkeypatch.setattr(server_module, "PROGRESS_INTERVAL_S", 0.05)
+    (board_dir / "lab.yaml").write_text(
+        PROFILE_YAML.replace("boot_wait: 0.01", "boot_wait: 0.2")
+    )
+    server = create_server(
+        Settings(
+            config_dir=board_dir,
+            audit_log=tmp_path / "audit.jsonl",
+            client_factory=lambda **kwargs: httpx.Client(
+                transport=daemon.transport(), **kwargs
+            ),
+        )
+    )
+    async with _client_session(server) as session:
+        result = await session.call_tool(
+            "boot_and_wait", {"mode": "sd", "board": "lab"}
+        )
+    is_error = getattr(
+        result, "is_error", getattr(result, "isError", None)
+    )
+    assert is_error is False
+    assert json.loads(result.content[0].text)["ok"] is True
 
 
 # ---------------------------------------------------------------------------

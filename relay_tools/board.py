@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from relay_tools.board_config import (
     BoardProfile,
@@ -83,6 +83,7 @@ class BoardController:
         actor: str = "relay-board",
         audit_id: str | None = None,
         board_name: str | None = None,
+        step_observer: "Callable[[str], None] | None" = None,
     ) -> None:
         self.profile = profile
         self.relay_client = relay_client
@@ -90,6 +91,7 @@ class BoardController:
         self.actor = actor
         self.audit_id = audit_id
         self.board_name = board_name or profile.name
+        self.step_observer = step_observer
 
     def status(self) -> BoardStatus:
         relay_state = self.relay_client.status()
@@ -546,6 +548,11 @@ class BoardController:
         *,
         verify: bool,
     ) -> ExecutedStep:
+        if self.step_observer is not None:
+            try:
+                self.step_observer(step.name)
+            except Exception:  # noqa: BLE001 - observers are best-effort
+                logger.debug("step observer failed", exc_info=True)
         if step.action == "set":
             return self._set_target(step, verify=verify)
         if step.action == "pulse":
