@@ -43,7 +43,11 @@ actions; only the board profile on the Pi defines them.
 `relay-mcp` exposes the same functionality to agents as the tools
 `list_boots`, `console_log`, `boot_report`, `wait_for_console`,
 `console_state`, `dut_ip_address`, `list_console_actions` and
-`run_console_action`.
+`run_console_action`. `wait_for_console` blocks until the pattern matches or
+the timeout passes, and `dut_ip_address` takes `wait_s` (0..300) to block
+until an IPv4 address has been seen for the current boot; both report MCP
+progress every 10 s while they run (see
+[`mcp-server.md`](mcp-server.md)), so agents never need to poll.
 
 ## Profile schema: the `console:` block
 
