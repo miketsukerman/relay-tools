@@ -1,3 +1,9 @@
+relay-tools (0.7.0-1) unstable; urgency=medium
+
+  * Add HDMI screen capture daemon and client/MCP integrations.
+
+ -- Mikhail Tsukerman <mikhail.tsukerman@advantech.com>  Fri, 30 Oct 2026 14:06:30 +0000
+
 relay-tools (0.5.0-1) unstable; urgency=medium
 
   * Switch packaging to dh-virtualenv: bundle all Python dependencies,
