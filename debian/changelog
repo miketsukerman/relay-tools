@@ -1,3 +1,11 @@
+relay-tools (0.7.1-1) unstable; urgency=medium
+
+  * Create the "relay" system user in postinst so relay-console.service
+    (User=relay) no longer fails to start with status=217/USER on a fresh
+    install.
+
+ -- Mikhail Tsukerman <mikhail.tsukerman@advantech.com>  Mon, 03 Nov 2026 16:54:54 +0000
+
 relay-tools (0.7.0-1) unstable; urgency=medium
 
   * Add HDMI screen capture daemon and client/MCP integrations.
