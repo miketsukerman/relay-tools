@@ -8,9 +8,12 @@
 #
 # Install:
 #   sudo cp relay-console.service /etc/systemd/system/relay-console.service
-#   sudo useradd --system --home /var/lib/relay --groups dialout relay  # once
 #   sudo systemctl daemon-reload
 #   sudo systemctl enable --now relay-console
+#
+# The Debian package creates the "relay" system user (a member of dialout)
+# automatically in its postinst; only create it by hand for manual installs:
+#   sudo useradd --system --home /var/lib/relay --groups dialout relay
 #
 # Extra flags (e.g. --host/--port) can be passed via RELAY_CONSOLE_OPTS in
 # /etc/default/relay-console. When binding to a non-loopback host, set

@@ -1,0 +1,35 @@
+#!/bin/sh
+# postinst — create the system user that relay-console.service runs as.
+#
+# relay-console.service uses "User=relay"/"Group=relay". Without this user
+# systemd fails to start the unit with status=217/USER ("Failed to determine
+# user credentials"). Create the account (and its primary group) idempotently
+# on install/upgrade so the opt-in console service can be enabled without any
+# manual useradd step.
+set -e
+
+RELAY_USER=relay
+RELAY_HOME=/var/lib/relay
+
+case "$1" in
+    configure)
+        if ! getent group "$RELAY_USER" >/dev/null; then
+            addgroup --system "$RELAY_USER"
+        fi
+        if ! getent passwd "$RELAY_USER" >/dev/null; then
+            adduser --system --home "$RELAY_HOME" --no-create-home \
+                --ingroup "$RELAY_USER" --disabled-password \
+                --gecos "relay-tools service user" "$RELAY_USER"
+        fi
+        # relay-console opens board debug UARTs; dialout grants serial access.
+        if getent group dialout >/dev/null; then
+            adduser "$RELAY_USER" dialout >/dev/null || true
+        fi
+        ;;
+    abort-upgrade|abort-remove|abort-deconfigure)
+        ;;
+esac
+
+#DEBHELPER#
+
+exit 0
